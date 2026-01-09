@@ -6,6 +6,6 @@ namespace SecureFileMonitor.Core.Services
 {
     public interface IFileScannerService
     {
-        Task ScanDriveAsync(string driveLetter, IProgress<string> progress, CancellationToken cancellationToken);
+        Task ScanDriveAsync(string driveLetter, bool scanReparseFolders, IProgress<string> progress, CancellationToken cancellationToken);
     }
 }

@@ -10,7 +10,7 @@ namespace SecureFileMonitor.Core.Services
 {
     public class DatabaseService : IDatabaseService
     {
-        private SQLiteAsyncConnection _connection;
+        private SQLiteAsyncConnection? _connection;
         private readonly string _dbPath;
 
         public DatabaseService()
@@ -25,42 +25,42 @@ namespace SecureFileMonitor.Core.Services
             var options = new SQLiteConnectionString(_dbPath, true, key: password);
             _connection = new SQLiteAsyncConnection(options);
 
-            await _connection.CreateTableAsync<FileEntry>();
-            await _connection.CreateTableAsync<FileActivityEvent>();
-            await _connection.CreateTableAsync<FileMetadata>();
+            await _connection!.CreateTableAsync<FileEntry>();
+            await _connection!.CreateTableAsync<FileActivityEvent>();
+            await _connection!.CreateTableAsync<FileMetadata>();
         }
 
         public async Task SaveFileEntryAsync(FileEntry entry)
         {
             // Upsert
-            var existing = await _connection.Table<FileEntry>().Where(x => x.FilePath == entry.FilePath).FirstOrDefaultAsync();
+            var existing = await _connection!.Table<FileEntry>().Where(x => x.FilePath == entry.FilePath).FirstOrDefaultAsync();
             if (existing != null)
             {
                 entry.FileId = existing.FileId; // Keep ID? Wait, FileEntry has FRN as ID.
                 // Actually, FileEntry key should be FilePath for lookup, but FRN for filesystem identity.
                 // SQLite needs a Primary Key. Let's assume FileEntry defines one or we add [PrimaryKey] to Model.
-                await _connection.UpdateAsync(entry);
+                await _connection!.UpdateAsync(entry);
             }
             else
             {
-                await _connection.InsertAsync(entry);
+                await _connection!.InsertAsync(entry);
             }
         }
 
         public async Task<FileEntry> GetFileEntryAsync(string filePath)
         {
-            return await _connection.Table<FileEntry>().Where(x => x.FilePath == filePath).FirstOrDefaultAsync();
+            return await _connection!.Table<FileEntry>().Where(x => x.FilePath == filePath).FirstOrDefaultAsync();
         }
 
         public async Task<IEnumerable<FileEntry>> GetAllEntriesAsync()
         {
-            return await _connection.Table<FileEntry>().ToListAsync();
+            return await _connection!.Table<FileEntry>().ToListAsync();
         }
 
         public async Task<IEnumerable<FileEntry>> GetDuplicateFilesAsync()
         {
             // Naive approach since sqlite-net doesn't support easy GROUP BY HAVING via LINQ
-            var all = await _connection.Table<FileEntry>().ToListAsync();
+            var all = await _connection!.Table<FileEntry>().ToListAsync();
             var duplicates = all.GroupBy(x => x.CurrentHash)
                                 .Where(g => g.Count() > 1 && !string.IsNullOrEmpty(g.Key))
                                 .SelectMany(g => g)
@@ -70,24 +70,24 @@ namespace SecureFileMonitor.Core.Services
 
         public async Task SaveAuditLogAsync(FileActivityEvent activity)
         {
-            await _connection.InsertAsync(activity);
+            await _connection!.InsertAsync(activity);
         }
 
         public async Task SaveMetadataAsync(FileMetadata metadata)
         {
-            await _connection.InsertOrReplaceAsync(metadata);
+            await _connection!.InsertOrReplaceAsync(metadata);
         }
 
         public async Task<FileMetadata> GetMetadataAsync(string fileId)
         {
-            return await _connection.Table<FileMetadata>().Where(m => m.FileId == fileId).FirstOrDefaultAsync();
+            return await _connection!.Table<FileMetadata>().Where(m => m.FileId == fileId).FirstOrDefaultAsync();
         }
 
         public async Task<IEnumerable<FileEntry>> SearchFilesAsync(float[] queryVector, int limit = 10)
         {
             // 1. Fetch all metadata (Naive approach for small datasets)
             // For production with thousands of files, use a vector DB or specialized index.
-            var allMetadata = await _connection.Table<FileMetadata>().ToListAsync();
+            var allMetadata = await _connection!.Table<FileMetadata>().ToListAsync();
             
             var results = new List<(string FileId, double Score)>();
 
@@ -117,7 +117,7 @@ namespace SecureFileMonitor.Core.Services
                 // FileEntry PK is FilePath? No, it has FileId (FRN).
                 // But DatabaseService.GetFileEntryAsync uses path...
                 // Let's verify FileEntry structure in next step or use Table<FileEntry>.Where(x => x.FileId == id)
-                var entry = await _connection.Table<FileEntry>().Where(x => x.FileId == long.Parse(id)).FirstOrDefaultAsync();
+                var entry = await _connection!.Table<FileEntry>().Where(x => x.FileId == long.Parse(id)).FirstOrDefaultAsync();
                 if (entry != null) entries.Add(entry);
             }
             
@@ -144,7 +144,7 @@ namespace SecureFileMonitor.Core.Services
 
         public async Task<IEnumerable<FileEntry>> GetAllFilesAsync()
         {
-            return await _connection.Table<FileEntry>().ToListAsync();
+            return await _connection!.Table<FileEntry>().ToListAsync();
         }
     }
 }

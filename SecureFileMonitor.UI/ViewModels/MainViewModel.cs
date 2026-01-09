@@ -46,6 +46,9 @@ namespace SecureFileMonitor.UI.ViewModels
         private TranscriptionTask? _selectedTranscriptionTask;
 
         [ObservableProperty]
+        private bool _scanReparseFolders = true;
+
+        [ObservableProperty]
         private string _currentViewName = "VAULT"; // Default to Vault as requested
 
         // Statistics
@@ -222,7 +225,7 @@ namespace SecureFileMonitor.UI.ViewModels
                 await _dbService.InitializeAsync("SecurePassword123!");
                 
                 StatusMessage = "Scanning C: drive for existing files...";
-                await _scannerService.ScanDriveAsync("C:\\", new Progress<string>(s => StatusMessage = s), CancellationToken.None);
+                await _scannerService.ScanDriveAsync("C:\\", ScanReparseFolders, new Progress<string>(s => StatusMessage = s), CancellationToken.None);
                 StatusMessage = "Scan Complete. Click 'Load Files' to view.";
             }
             catch (Exception ex)

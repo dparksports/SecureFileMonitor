@@ -18,18 +18,27 @@ namespace SecureFileMonitor.Core.Services
             _logger = logger;
         }
 
-        public async Task ScanDriveAsync(string driveLetter, IProgress<string> progress, CancellationToken cancellationToken)
+        public async Task ScanDriveAsync(string driveLetter, bool scanReparseFolders, IProgress<string> progress, CancellationToken cancellationToken)
         {
+            var visitedPaths = new System.Collections.Generic.HashSet<string>(StringComparer.OrdinalIgnoreCase);
             await Task.Run(async () =>
             {
                 var root = new DirectoryInfo(driveLetter);
-                await ScanDirectoryRecursive(root, progress, cancellationToken);
+                await ScanDirectoryRecursive(root, scanReparseFolders, visitedPaths, progress, cancellationToken);
             });
         }
 
-        private async Task ScanDirectoryRecursive(DirectoryInfo directory, IProgress<string> progress, CancellationToken cancellationToken)
+        private async Task ScanDirectoryRecursive(DirectoryInfo directory, bool scanReparseFolders, System.Collections.Generic.HashSet<string> visitedPaths, IProgress<string>? progress, CancellationToken cancellationToken)
         {
             if (cancellationToken.IsCancellationRequested) return;
+
+            string canonicalPath = directory.FullName.ToLowerInvariant();
+            if (visitedPaths.Contains(canonicalPath)) 
+            {
+                _logger.LogInformation($"Skipping duplicate or cyclic path: {directory.FullName}");
+                return;
+            }
+            visitedPaths.Add(canonicalPath);
 
             try
             {
@@ -74,10 +83,11 @@ namespace SecureFileMonitor.Core.Services
                 // Recurse
                 foreach (var subDir in directory.EnumerateDirectories())
                 {
-                    // Skip system/hidden if needed?
-                    if ((subDir.Attributes & FileAttributes.ReparsePoint) != 0) continue; // Skip symlinks/junctions to avoid loops
+                    // Skip reparse points ONLY if scanReparseFolders is false.
+                    // If true, we rely on visitedPaths loop detection.
+                    if (!scanReparseFolders && (subDir.Attributes & FileAttributes.ReparsePoint) != 0) continue;
                     
-                    await ScanDirectoryRecursive(subDir, progress, cancellationToken);
+                    await ScanDirectoryRecursive(subDir, scanReparseFolders, visitedPaths, progress, cancellationToken);
                 }
             }
             catch (UnauthorizedAccessException)

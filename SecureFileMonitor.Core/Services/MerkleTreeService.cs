@@ -43,7 +43,7 @@ namespace SecureFileMonitor.Core.Services
             for (int i = 0; i < nodes.Count; i += 2)
             {
                 var left = nodes[i];
-                var right = (i + 1 < nodes.Count) ? nodes[i + 1] : null;
+                MerkleNode? right = (i + 1 < nodes.Count) ? nodes[i + 1] : null;
 
                 var parentHash = ComputeParentHash(left.Hash, right?.Hash);
                 
@@ -71,7 +71,7 @@ namespace SecureFileMonitor.Core.Services
                 for (int i = 0; i < currentLevel.Count; i += 2)
                 {
                     string left = currentLevel[i];
-                    string right = (i + 1 < currentLevel.Count) ? currentLevel[i + 1] : null;
+                    string? right = (i + 1 < currentLevel.Count) ? currentLevel[i + 1] : null;
                     nextLevel.Add(ComputeParentHash(left, right));
                 }
                 currentLevel = nextLevel;

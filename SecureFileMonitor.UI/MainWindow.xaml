@@ -53,6 +53,7 @@
                             <Button Command="{Binding StopMonitoringCommand}" Content="Stop" Background="Red" Foreground="White" Padding="10,2" FontSize="12" IsEnabled="{Binding IsMonitoring}"/>
                         </StackPanel>
                         <CheckBox IsChecked="{Binding MonitorInternalDatabase}" Content="Monitor Internal DB" Foreground="Gray" FontSize="11"/>
+                        <CheckBox IsChecked="{Binding ScanReparseFolders}" Content="Scan Reparse Folders" Foreground="Gray" FontSize="11" Margin="0,2,0,0"/>
                     </StackPanel>
                 </Border>
 
@@ -112,6 +113,13 @@
                             </Grid.ColumnDefinitions>
                             
                             <StackPanel Orientation="Horizontal">
+                                <Button Command="{Binding ScanDriveCommand}" Content="📂 Scan Drive" 
+                                        Background="#333" Foreground="White" Padding="10,5" Margin="0,0,10,0"/>
+                                <Button Command="{Binding LoadAllFilesCommand}" Content="📋 Refresh List" 
+                                        Background="#333" Foreground="White" Padding="10,5" Margin="0,0,15,0"/>
+                            </StackPanel>
+
+                            <StackPanel Grid.Column="1" Orientation="Horizontal">
                                 <TextBlock Text="SORT BY:" Foreground="Gray" VerticalAlignment="Center" Margin="0,0,5,0"/>
                                 <ComboBox SelectedValue="{Binding SortBy}" SelectedValuePath="Content" Width="100" Background="#333" Foreground="White">
                                     <ComboBoxItem Content="Name"/>
@@ -135,13 +143,6 @@
                                 
                                 <TextBlock Text="TO:" Foreground="Gray" VerticalAlignment="Center" Margin="5,0,5,0"/>
                                 <DatePicker SelectedDate="{Binding DateFilterEnd}" Background="#333" Width="100"/>
-                            </StackPanel>
-
-                            <StackPanel Grid.Column="1" Orientation="Horizontal">
-                                <Button Command="{Binding ScanDriveCommand}" Content="📂 Scan Drive" 
-                                        Background="#333" Foreground="White" Padding="10,5" Margin="10,0,0,0"/>
-                                <Button Command="{Binding LoadAllFilesCommand}" Content="📋 Refresh List" 
-                                        Background="#333" Foreground="White" Padding="10,5" Margin="5,0,0,0"/>
                             </StackPanel>
                         </Grid>
                         

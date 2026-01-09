@@ -17,10 +17,10 @@ namespace SecureFileMonitor.Core.Models
         private string _id = Guid.NewGuid().ToString();
 
         [ObservableProperty]
-        private string _filePath;
+        private string _filePath = string.Empty;
 
         [ObservableProperty]
-        private string _fileName;
+        private string _fileName = string.Empty;
 
         [ObservableProperty]
         private TranscriptionStatus _status = TranscriptionStatus.Queued;
@@ -29,10 +29,10 @@ namespace SecureFileMonitor.Core.Models
         private double _progress;
 
         [ObservableProperty]
-        private string _transcript;
+        private string _transcript = string.Empty;
 
         [ObservableProperty]
-        private string _errorMessage;
+        private string _errorMessage = string.Empty;
 
         [ObservableProperty]
         private DateTime _queuedAt = DateTime.Now;
