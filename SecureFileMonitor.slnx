@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="SecureFileMonitor.Core/SecureFileMonitor.Core.csproj" />
+  <Project Path="SecureFileMonitor.UI/SecureFileMonitor.UI.csproj" />
+</Solution>
