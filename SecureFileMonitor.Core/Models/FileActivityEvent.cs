@@ -35,6 +35,7 @@ namespace SecureFileMonitor.Core.Models
         Read,
         Write,
         Delete,
-        Rename
+        Rename,
+        Open
     }
 }

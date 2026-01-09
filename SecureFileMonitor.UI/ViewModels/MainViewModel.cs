@@ -839,6 +839,12 @@ namespace SecureFileMonitor.UI.ViewModels
                         {
                             var meta = await _dbService.GetMetadataAsync(file.FileId.ToString()) ?? new FileMetadata { FileId = file.FileId.ToString() };
                             meta.Transcription = task.Transcript;
+                            
+                            // Generate embedding for semantic search
+                            StatusMessage = $"Generating embedding for {task.FileName}...";
+                            meta.VectorEmbedding = await _aiService.GenerateEmbeddingAsync(task.Transcript);
+                            meta.LastAnalyzed = DateTime.Now;
+                            
                             await _dbService.SaveMetadataAsync(meta);
                         }
                     }

@@ -47,14 +47,27 @@ namespace SecureFileMonitor.Core.Services
                             if (string.IsNullOrEmpty(data.FileName)) return;
                             if (IgnoreInternalDatabase && IsInternalDatabase(data.FileName)) return;
 
-                            // Filter system files if needed, but for now capture all
+                            // CreateDisposition: 1 = Open, 2 = Create, 3 = OpenIf, 4 = Overwrite, 5 = OverwriteIf
+                            var op = FileOperation.Create;
+                            if ((int)data.CreateDisposition == 1) // FILE_OPEN
+                            {
+                                // We might want to skip "Open" if specifically looking for creation
+                                // But for a "Monitor", seeing what opened what is also valuable.
+                                // Let's label it correctly.
+                                op = FileOperation.Open; 
+                            }
+                            else if ((int)data.CreateDisposition == 2 || (int)data.CreateDisposition == 5)
+                            {
+                                op = FileOperation.Create;
+                            }
+
                             OnFileActivity?.Invoke(this, new FileActivityEvent
                             {
                                 Timestamp = data.TimeStamp,
                                 ProcessId = data.ProcessID,
                                 ProcessName = data.ProcessName,
                                 FilePath = data.FileName,
-                                Operation = FileOperation.Create,
+                                Operation = op,
                                 UserName = Environment.UserName 
                             });
                         };
