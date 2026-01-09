@@ -79,3 +79,7 @@ _CR/
 *.db
 *.db-shm
 *.db-wal
+
+# Build Artifacts
+publish/
+*.zip
