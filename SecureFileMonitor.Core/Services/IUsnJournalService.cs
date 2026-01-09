@@ -5,8 +5,9 @@ namespace SecureFileMonitor.Core.Services
 {
     public interface IUsnJournalService
     {
-        void Initialize(string driverLetter);
-        IEnumerable<FileEntry> ReadChanges();
-        long GetCurrentUsn();
+        void Initialize(string driveLetter);
+        Task InitializeAllDrivesAsync();
+        IEnumerable<FileEntry> ReadChanges(string driveLetter);
+        long GetCurrentUsn(string driveLetter);
     }
 }

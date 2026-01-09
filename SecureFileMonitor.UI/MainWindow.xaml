@@ -5,146 +5,282 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:SecureFileMonitor.UI"
         xmlns:vm="clr-namespace:SecureFileMonitor.UI.ViewModels"
+        xmlns:conv="clr-namespace:SecureFileMonitor.UI.Converters"
         mc:Ignorable="d"
         Title="Secure File Monitor - PROTECTED" Height="650" Width="1000"
         Background="#181818"
         WindowStartupLocation="CenterScreen">
 
+    <Window.Resources>
+        <conv:ViewToVisibilityConverter x:Key="ViewToVisibilityConverter"/>
+        <conv:ViewToColorConverter x:Key="ViewToColorConverter"/>
+    </Window.Resources>
+
     <Grid>
         <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <!-- Header -->
-        <Grid Grid.Row="0" Margin="20,15">
-            <StackPanel Orientation="Horizontal">
-                <!-- Shield Icon placeholder -->
-                <TextBlock Text="&#xE8B9;" FontFamily="Segoe MDL2 Assets" FontSize="24" Foreground="SpringGreen" Margin="0,0,10,0"/>
-                <TextBlock Text="SECURE FILE MONITOR" FontSize="20" FontWeight="Bold" Foreground="White" VerticalAlignment="Center"/>
-                <Border Background="#33FF0000" CornerRadius="4" Margin="20,0,0,0" Padding="10,2" VerticalAlignment="Center">
-                    <TextBlock Text="HIGH SECURITY MODE" Foreground="Red" FontWeight="SemiBold" FontSize="12"/>
-                </Border>
-            </StackPanel>
-            
-            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                <TextBlock Text="{Binding StatusMessage}" Foreground="LightGray" VerticalAlignment="Center" Margin="0,0,15,0"/>
-                <Button Command="{Binding StartMonitoringCommand}" Content="Start" Background="Green" Foreground="White" Padding="15,5" Margin="0,0,10,0" IsEnabled="{Binding IsMonitoring, Converter={StaticResource InverseBooleanConverter}}"/>
-                <Button Command="{Binding StopMonitoringCommand}" Content="Stop" Background="Red" Foreground="White" Padding="15,5" IsEnabled="{Binding IsMonitoring}"/>
-            </StackPanel>
-        </Grid>
+
 
         <!-- Main Content -->
-        <Grid Grid.Row="1" Margin="20,10">
+        <Grid Grid.Row="0" Margin="20,15">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="250"/>
                 <ColumnDefinition Width="*"/>
             </Grid.ColumnDefinitions>
 
-            <!-- Sidebar Stats -->
+            <!-- Sidebar -->
             <StackPanel Grid.Column="0" Margin="0,0,20,0">
+                <!-- Branding -->
+                <StackPanel Margin="0,0,0,20">
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,5">
+                        <TextBlock Text="&#xE8B9;" FontFamily="Segoe MDL2 Assets" FontSize="20" Foreground="SpringGreen" Margin="0,0,8,0"/>
+                        <TextBlock Text="SECURE FILE MONITOR" FontSize="16" FontWeight="Bold" Foreground="White" VerticalAlignment="Center"/>
+                    </StackPanel>
+                    <Border Background="#33FF0000" CornerRadius="4" HorizontalAlignment="Left" Padding="8,2">
+                        <TextBlock Text="HIGH SECURITY MODE" Foreground="Red" FontWeight="SemiBold" FontSize="10"/>
+                    </Border>
+                </StackPanel>
+
+                <!-- Monitoring Controls -->
+                <TextBlock Text="MONITORING" FontWeight="Bold" Foreground="Gray" Margin="0,0,0,5" FontSize="10"/>
                 <Border Background="#222" CornerRadius="4" Padding="10" Margin="0,0,0,10">
                     <StackPanel>
-                        <TextBlock Text="Database" FontWeight="Bold" Foreground="White"/>
-                        <TextBlock Text="Encrypted (SQLCipher)" Foreground="Gray"/>
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,5">
+                            <Button Command="{Binding StartMonitoringCommand}" Content="Start" Background="Green" Foreground="White" Padding="10,2" Margin="0,0,5,0" FontSize="12" IsEnabled="{Binding IsMonitoring, Converter={StaticResource InverseBooleanConverter}}"/>
+                            <Button Command="{Binding StopMonitoringCommand}" Content="Stop" Background="Red" Foreground="White" Padding="10,2" FontSize="12" IsEnabled="{Binding IsMonitoring}"/>
+                        </StackPanel>
+                        <CheckBox IsChecked="{Binding MonitorInternalDatabase}" Content="Monitor Internal DB" Foreground="Gray" FontSize="11"/>
                     </StackPanel>
                 </Border>
+
+                <!-- Stats Border -->
                 <Border Background="#222" CornerRadius="4" Padding="10" Margin="0,0,0,10">
                     <StackPanel>
-                        <TextBlock Text="Monitor Status" FontWeight="Bold" Foreground="White"/>
+                        <TextBlock Text="Monitor Status" FontWeight="Bold" Foreground="White" FontSize="12"/>
                         <TextBlock Text="{Binding IsMonitoring, StringFormat='Active: {0}'}" Foreground="SpringGreen"/>
-                    </StackPanel>
-                </Border>
-                <Border Background="#222" CornerRadius="4" Padding="10" Margin="0,0,0,10">
-                    <StackPanel>
-                        <TextBlock Text="Processing" FontWeight="Bold" Foreground="White"/>
+                        <Separator Background="#333" Margin="0,5"/>
+                        <TextBlock Text="Processing" FontWeight="Bold" Foreground="White" FontSize="12"/>
                         <TextBlock Text="Tracking changes..." Foreground="Gray"/>
                     </StackPanel>
                 </Border>
+                
+                <!-- Navigation -->
+                <TextBlock Text="NAVIGATION" FontWeight="Bold" Foreground="Gray" Margin="0,10,0,5" FontSize="10"/>
+                <Button Command="{Binding SwitchViewCommand}" CommandParameter="VAULT" Content="📁 VAULT" 
+                        Background="{Binding CurrentViewName, Converter={StaticResource ViewToColorConverter}, ConverterParameter=VAULT}" 
+                        Foreground="White" Padding="10" Margin="0,2,0,0" HorizontalContentAlignment="Left" BorderThickness="0"/>
+                <Button Command="{Binding SwitchViewCommand}" CommandParameter="LIVE" Content="⚡ LIVE ACTIVITY" 
+                        Background="{Binding CurrentViewName, Converter={StaticResource ViewToColorConverter}, ConverterParameter=LIVE}" 
+                        Foreground="White" Padding="10" Margin="0,2,0,0" HorizontalContentAlignment="Left" BorderThickness="0"/>
+                <Button Command="{Binding SwitchViewCommand}" CommandParameter="DUPLICATES" Content="👯 DUPLICATES" 
+                        Background="{Binding CurrentViewName, Converter={StaticResource ViewToColorConverter}, ConverterParameter=DUPLICATES}" 
+                        Foreground="White" Padding="10" Margin="0,2,0,0" HorizontalContentAlignment="Left" BorderThickness="0"/>
+                <Button Command="{Binding SwitchViewCommand}" CommandParameter="SEARCH" Content="🔍 SEMANTIC SEARCH" 
+                        Background="{Binding CurrentViewName, Converter={StaticResource ViewToColorConverter}, ConverterParameter=SEARCH}" 
+                        Foreground="White" Padding="10" Margin="0,2,0,0" HorizontalContentAlignment="Left" BorderThickness="0"/>
+                <Button Command="{Binding SwitchViewCommand}" CommandParameter="DETAILS" Content="ℹ️ FILE DETAILS" 
+                        Background="{Binding CurrentViewName, Converter={StaticResource ViewToColorConverter}, ConverterParameter=DETAILS}" 
+                        Foreground="White" Padding="10" Margin="0,2,0,0" HorizontalContentAlignment="Left" BorderThickness="0"/>
+
+                <!-- Action Buttons -->
+                <TextBlock Text="AI SERVICES" FontWeight="Bold" Foreground="Gray" Margin="0,20,0,5" FontSize="10"/>
+                <Button Command="{Binding DownloadModelsCommand}" Content="⬇️ Download AI Models" 
+                        Background="#2E7D32" Foreground="White" Padding="10" Margin="0,5,0,0" HorizontalContentAlignment="Left"/>
             </StackPanel>
 
-            <!-- Main Content Area with Tabs -->
+            <!-- Main Content Area -->
             <Border Grid.Column="1" Background="#11FFFFFF" CornerRadius="8" Padding="10">
-                <TabControl Background="Transparent" BorderThickness="0">
-                    <TabControl.Resources>
-                        <Style TargetType="TabItem">
-                            <Setter Property="Foreground" Value="Gray"/>
-                            <Setter Property="FontSize" Value="14"/>
-                            <Setter Property="Template">
-                                <Setter.Value>
-                                    <ControlTemplate TargetType="TabItem">
-                                        <Border Name="Border" BorderThickness="0,0,0,2" BorderBrush="Transparent" Padding="10,5">
-                                            <ContentPresenter ContentSource="Header" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                        </Border>
-                                        <ControlTemplate.Triggers>
-                                            <Trigger Property="IsSelected" Value="True">
-                                                <Setter TargetName="Border" Property="BorderBrush" Value="SpringGreen"/>
-                                                <Setter Property="Foreground" Value="White"/>
-                                            </Trigger>
-                                        </ControlTemplate.Triggers>
-                                    </ControlTemplate>
-                                </Setter.Value>
-                            </Setter>
-                        </Style>
-                    </TabControl.Resources>
-                    
-                    <TabItem Header="LIVE ACTIVITY">
-                        <Grid>
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="*"/>
-                            </Grid.RowDefinitions>
-                            <TextBlock Text="REAL-TIME EVENTS" FontWeight="SemiBold" Foreground="LightGray" Margin="0,10,0,10"/>
+                <Grid>
+                    <!-- VAULT View -->
+                    <Grid Visibility="{Binding CurrentViewName, Converter={StaticResource ViewToVisibilityConverter}, ConverterParameter=VAULT}">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                        </Grid.RowDefinitions>
+                        
+                        <!-- Filter & Action Controls -->
+                        <Grid Margin="0,10">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
                             
-                            <DataGrid Grid.Row="1" ItemsSource="{Binding RecentActivity}" AutoGenerateColumns="False" 
-                                      Background="Transparent" BorderThickness="0" HeadersVisibility="Column"
-                                      IsReadOnly="True" RowBackground="#222" AlternatingRowBackground="#2A2A2A" Foreground="White">
-                                <DataGrid.Columns>
-                                    <DataGridTextColumn Header="Time" Binding="{Binding Timestamp, StringFormat=HH:mm:ss}" Width="80"/>
-                                    <DataGridTextColumn Header="Operation" Binding="{Binding Operation}" Width="80"/>
-                                    <DataGridTextColumn Header="Process" Binding="{Binding ProcessName}" Width="120"/>
-                                    <DataGridTextColumn Header="User" Binding="{Binding UserName}" Width="100"/>
-                                    <DataGridTextColumn Header="Path" Binding="{Binding FilePath}" Width="*"/>
-                                </DataGrid.Columns>
-                            </DataGrid>
-                        </Grid>
-                    </TabItem>
-                    
-                    <TabItem Header="DUPLICATES">
-                         <Grid>
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="*"/>
-                            </Grid.RowDefinitions>
-                            <StackPanel Orientation="Horizontal" Margin="0,10,0,10">
-                                <TextBlock Text="DUPLICATE FILE FINDER" FontWeight="SemiBold" Foreground="LightGray" VerticalAlignment="Center" Margin="0,0,20,0"/>
-                                <Button Command="{Binding ScanDuplicatesCommand}" Content="Scan Now" Background="#333" Foreground="White" Padding="10,2"/>
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="SORT BY:" Foreground="Gray" VerticalAlignment="Center" Margin="0,0,5,0"/>
+                                <ComboBox SelectedValue="{Binding SortBy}" SelectedValuePath="Content" Width="100" Background="#333" Foreground="White">
+                                    <ComboBoxItem Content="Name"/>
+                                    <ComboBoxItem Content="CreationTime"/>
+                                    <ComboBoxItem Content="LastModified"/>
+                                </ComboBox>
+                                
+                                <TextBlock Text="TYPE:" Foreground="Gray" VerticalAlignment="Center" Margin="15,0,5,0"/>
+                                <ComboBox SelectedValue="{Binding FileTypeFilter}" SelectedValuePath="Content" Width="80" Background="#333" Foreground="White">
+                                    <ComboBoxItem Content="All"/>
+                                    <ComboBoxItem Content="Audio"/>
+                                    <ComboBoxItem Content="Video"/>
+                                    <ComboBoxItem Content="Image"/>
+                                    <ComboBoxItem Content="Office"/>
+                                    <ComboBoxItem Content="PDF"/>
+                                    <ComboBoxItem Content="Text"/>
+                                </ComboBox>
+                                
+                                <TextBlock Text="FROM:" Foreground="Gray" VerticalAlignment="Center" Margin="15,0,5,0"/>
+                                <DatePicker SelectedDate="{Binding DateFilterStart}" Background="#333" Width="100"/>
+                                
+                                <TextBlock Text="TO:" Foreground="Gray" VerticalAlignment="Center" Margin="5,0,5,0"/>
+                                <DatePicker SelectedDate="{Binding DateFilterEnd}" Background="#333" Width="100"/>
                             </StackPanel>
-                            
-                            <DataGrid Grid.Row="1" ItemsSource="{Binding DuplicateFiles}" AutoGenerateColumns="False" 
-                                      Background="Transparent" BorderThickness="0" HeadersVisibility="Column"
-                                      IsReadOnly="True" RowBackground="#222" AlternatingRowBackground="#2A2A2A" Foreground="White">
-                                <DataGrid.Columns>
-                                    <DataGridTextColumn Header="Hash" Binding="{Binding CurrentHash}" Width="200"/>
-                                    <DataGridTextColumn Header="Path" Binding="{Binding FilePath}" Width="*"/>
-                                    <DataGridTextColumn Header="Size" Binding="{Binding FileId}" Width="80"/> <!-- Placeholder for Size if added later -->
-                                    <DataGridTextColumn Header="Last Modified" Binding="{Binding LastModified}" Width="150"/>
-                                </DataGrid.Columns>
-                            </DataGrid>
+
+                            <StackPanel Grid.Column="1" Orientation="Horizontal">
+                                <Button Command="{Binding ScanDriveCommand}" Content="📂 Scan Drive" 
+                                        Background="#333" Foreground="White" Padding="10,5" Margin="10,0,0,0"/>
+                                <Button Command="{Binding LoadAllFilesCommand}" Content="📋 Refresh List" 
+                                        Background="#333" Foreground="White" Padding="10,5" Margin="5,0,0,0"/>
+                            </StackPanel>
                         </Grid>
-                    </TabItem>
-                </TabControl>
+                        
+                        <DataGrid Grid.Row="1" ItemsSource="{Binding FilteredFiles}" AutoGenerateColumns="False" 
+                                  Background="Transparent" BorderThickness="0" HeadersVisibility="Column"
+                                  IsReadOnly="True" RowBackground="#222" AlternatingRowBackground="#2A2A2A" Foreground="White"
+                                  SelectedItem="{Binding SelectedFile}">
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="Name" Binding="{Binding FileName}" Width="200"/>
+                                <DataGridTextColumn Header="Extension" Binding="{Binding FileExtension}" Width="80"/>
+                                <DataGridTextColumn Header="Size" Binding="{Binding FileSize}" Width="100"/>
+                                <DataGridTextColumn Header="Created" Binding="{Binding CreationTime, StringFormat=yyyy-MM-dd HH:mm}" Width="140"/>
+                                <DataGridTextColumn Header="Modified" Binding="{Binding LastModified, StringFormat=yyyy-MM-dd HH:mm}" Width="140"/>
+                                <DataGridTextColumn Header="Path" Binding="{Binding FilePath}" Width="*"/>
+                            </DataGrid.Columns>
+                        </DataGrid>
+                    </Grid>
+
+                    <!-- LIVE ACTIVITY View -->
+                    <Grid Visibility="{Binding CurrentViewName, Converter={StaticResource ViewToVisibilityConverter}, ConverterParameter=LIVE}">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                        </Grid.RowDefinitions>
+                        <TextBlock Text="REAL-TIME EVENTS" FontWeight="SemiBold" Foreground="LightGray" Margin="0,10,0,10"/>
+                        
+                        <DataGrid Grid.Row="1" ItemsSource="{Binding RecentActivity}" AutoGenerateColumns="False" 
+                                  Background="Transparent" BorderThickness="0" HeadersVisibility="Column"
+                                  IsReadOnly="True" RowBackground="#222" AlternatingRowBackground="#2A2A2A" Foreground="White">
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="Time" Binding="{Binding Timestamp, StringFormat=HH:mm:ss}" Width="80"/>
+                                <DataGridTextColumn Header="Operation" Binding="{Binding Operation}" Width="80"/>
+                                <DataGridTextColumn Header="Process" Binding="{Binding ProcessName}" Width="120"/>
+                                <DataGridTextColumn Header="User" Binding="{Binding UserName}" Width="100"/>
+                                <DataGridTextColumn Header="Path" Binding="{Binding FilePath}" Width="*"/>
+                            </DataGrid.Columns>
+                        </DataGrid>
+                    </Grid>
+
+                    <!-- DUPLICATES View -->
+                    <Grid Visibility="{Binding CurrentViewName, Converter={StaticResource ViewToVisibilityConverter}, ConverterParameter=DUPLICATES}">
+                         <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                        </Grid.RowDefinitions>
+                        <StackPanel Orientation="Horizontal" Margin="0,10,0,10">
+                            <TextBlock Text="DUPLICATE FILE FINDER" FontWeight="SemiBold" Foreground="LightGray" VerticalAlignment="Center" Margin="0,0,20,0"/>
+                            <Button Command="{Binding ScanDuplicatesCommand}" Content="Scan Now" Background="#333" Foreground="White" Padding="10,2"/>
+                        </StackPanel>
+                        
+                        <DataGrid Grid.Row="1" ItemsSource="{Binding DuplicateFiles}" AutoGenerateColumns="False" 
+                                  Background="Transparent" BorderThickness="0" HeadersVisibility="Column"
+                                  IsReadOnly="True" RowBackground="#222" AlternatingRowBackground="#2A2A2A" Foreground="White">
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="Hash" Binding="{Binding CurrentHash}" Width="200"/>
+                                <DataGridTextColumn Header="Path" Binding="{Binding FilePath}" Width="*"/>
+                                <DataGridTextColumn Header="Size" Binding="{Binding FileId}" Width="80"/>
+                                <DataGridTextColumn Header="Last Modified" Binding="{Binding LastModified}" Width="150"/>
+                            </DataGrid.Columns>
+                        </DataGrid>
+                    </Grid>
+
+                    <!-- SEMANTIC SEARCH View -->
+                    <Grid Visibility="{Binding CurrentViewName, Converter={StaticResource ViewToVisibilityConverter}, ConverterParameter=SEARCH}">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                        </Grid.RowDefinitions>
+                        <StackPanel Orientation="Vertical" Margin="0,10,0,10">
+                            <TextBlock Text="SEARCH BY CONTENT DESCRIPTION" FontWeight="SemiBold" Foreground="LightGray" Margin="0,0,0,5"/>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBox Text="{Binding SearchQuery, UpdateSourceTrigger=PropertyChanged}" Background="#333" Foreground="White" BorderThickness="0" Padding="5"/>
+                                <Button Grid.Column="1" Command="{Binding SearchCommand}" Content="Analyze &amp; Search" Background="SpringGreen" Foreground="Black" Padding="10,5" Margin="10,0,0,0" FontWeight="Bold"/>
+                            </Grid>
+                        </StackPanel>
+                        
+                        <DataGrid Grid.Row="1" ItemsSource="{Binding SearchResults}" AutoGenerateColumns="False" 
+                                  Background="Transparent" BorderThickness="0" HeadersVisibility="Column"
+                                  IsReadOnly="True" RowBackground="#222" AlternatingRowBackground="#2A2A2A" Foreground="White"
+                                  SelectedItem="{Binding SelectedFile}">
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="Path" Binding="{Binding FilePath}" Width="*"/>
+                                <DataGridTextColumn Header="Last Modified" Binding="{Binding LastModified}" Width="150"/>
+                            </DataGrid.Columns>
+                        </DataGrid>
+                    </Grid>
+                    
+                    <!-- FILE DETAILS View -->
+                    <Grid Visibility="{Binding CurrentViewName, Converter={StaticResource ViewToVisibilityConverter}, ConverterParameter=DETAILS}">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                        </Grid.RowDefinitions>
+                        
+                        <StackPanel Margin="0,10">
+                            <TextBlock Text="SELECTED FILE:" FontWeight="Bold" Foreground="Gray"/>
+                            <TextBlock Text="{Binding SelectedFile.FilePath, TargetNullValue='(Select a file from Vault or Search)'}" Foreground="White" TextWrapping="Wrap" Margin="0,5"/>
+                        </StackPanel>
+                        
+                        <StackPanel Grid.Row="1" Margin="0,10">
+                            <TextBlock Text="USER TAGS (Comma Separated):" FontWeight="Bold" Foreground="Gray"/>
+                            <TextBox Text="{Binding SelectedFileTags, UpdateSourceTrigger=PropertyChanged}" Background="#333" Foreground="White" Padding="5" Margin="0,5"/>
+                            <Button Command="{Binding SaveTagsCommand}" Content="Save Tags" HorizontalAlignment="Right" Padding="15,5" Background="SpringGreen" Foreground="Black"/>
+                        </StackPanel>
+                    </Grid>
+                </Grid>
             </Border>
         </Grid>
 
-        <!-- Footer -->
-        <StatusBar Grid.Row="2" Background="#111111" Foreground="Gray">
+        <!-- Footer - Shows Scan Status and Statistics -->
+        <StatusBar Grid.Row="1" Background="#111111" Foreground="Gray" Padding="5,2">
             <StatusBarItem>
-                <TextBlock Text="System Integrity: OK"/>
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="Total: " FontWeight="Bold"/>
+                    <TextBlock Text="{Binding TotalFiles}" Foreground="LightBlue" Margin="0,0,15,0"/>
+                    
+                    <TextBlock Text="Video: " FontWeight="Bold"/>
+                    <TextBlock Text="{Binding TotalVideoFiles}" Foreground="Orange" Margin="0,0,15,0"/>
+                    
+                    <TextBlock Text="Audio: " FontWeight="Bold"/>
+                    <TextBlock Text="{Binding TotalAudioFiles}" Foreground="Purple" Margin="0,0,15,0"/>
+                    
+                    <TextBlock Text="Code Lines: " FontWeight="Bold"/>
+                    <TextBlock Text="{Binding TotalCodeFiles}" Foreground="SpringGreen" Margin="0,0,15,0"/>
+                    
+                    <Separator Width="1" Background="#333" Margin="10,0"/>
+                    
+                    <TextBlock Text="Status: " FontWeight="Bold"/>
+                    <TextBlock Text="{Binding StatusMessage}" Foreground="SpringGreen"/>
+                </StackPanel>
             </StatusBarItem>
             <StatusBarItem HorizontalAlignment="Right">
-                <TextBlock Text="SecureFileMonitor v1.0.0"/>
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="Last Scanned: " Foreground="Gray"/>
+                    <TextBlock Text="{Binding LastScannedTime}" Foreground="White" Margin="0,0,10,0"/>
+                    <TextBlock Text="SecureFileMonitor v1.0.0"/>
+                </StackPanel>
             </StatusBarItem>
         </StatusBar>
     </Grid>

@@ -15,5 +15,7 @@ namespace SecureFileMonitor.Core.Services
         
         Task SaveMetadataAsync(FileMetadata metadata);
         Task<FileMetadata> GetMetadataAsync(string fileId);
+        Task<IEnumerable<FileEntry>> SearchFilesAsync(float[] queryVector, int limit = 10);
+        Task<IEnumerable<FileEntry>> GetAllFilesAsync();
     }
 }

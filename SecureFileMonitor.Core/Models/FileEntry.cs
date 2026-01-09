@@ -12,7 +12,10 @@ namespace SecureFileMonitor.Core.Models
         public long Usn { get; set; }
         public string FileName { get; set; } = string.Empty;
         public bool IsDirectory { get; set; }
+        public long FileSize { get; set; }
+        public string FileExtension { get; set; } = string.Empty;
         
+        public DateTime CreationTime { get; set; }
         public DateTime LastModified { get; set; }
         
         // Integrity

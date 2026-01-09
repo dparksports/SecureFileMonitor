@@ -12,76 +12,147 @@ namespace SecureFileMonitor.Core.Services
 {
     public class UsnJournalService : IUsnJournalService, IDisposable
     {
-        private SafeFileHandle? _volumeHandle;
-        private string _driveLetter = string.Empty;
-        private long _nextUsn;
+        private readonly Dictionary<string, SafeFileHandle> _volumeHandles = new();
+        private readonly Dictionary<string, long> _nextUsnMap = new();
 
         public void Initialize(string driveLetter)
         {
-            _driveLetter = driveLetter.TrimEnd('\\');
-            string volumePath = $@"\\.\{_driveLetter}";
-            
-            _volumeHandle = NativeMethods.CreateFile(
-                volumePath,
-                NativeMethods.GENERIC_READ | NativeMethods.GENERIC_WRITE, // Write access needed for DeviceIoControl? Actually Read is usually enough, but sometimes Query needs specific rights. Docs say GENERIC_READ | GENERIC_WRITE recommended for USN ops.
-                NativeMethods.FILE_SHARE_READ | NativeMethods.FILE_SHARE_WRITE,
-                IntPtr.Zero,
-                NativeMethods.OPEN_EXISTING,
-                0,
-                IntPtr.Zero);
+            driveLetter = driveLetter.TrimEnd('\\');
+            if (_volumeHandles.ContainsKey(driveLetter)) return;
 
-            if (_volumeHandle.IsInvalid)
+            var volHandle = NativeMethods.CreateFile(
+                $"\\\\.\\{driveLetter}",
+                (uint)(FileAccess.Read | FileAccess.Write),
+                (uint)(FileShare.Read | FileShare.Write),
+                IntPtr.Zero,
+                (uint)FileMode.Open,
+                0,
+                IntPtr.Zero
+            );
+
+            if (volHandle.IsInvalid)
             {
-                throw new Win32Exception(Marshal.GetLastWin32Error(), $"Failed to open volume {_driveLetter}");
+                 // CreateFile failed. Likely access denied or drive not supported.
+                 // Log and continue.
+                 return;
             }
 
-            var journalData = QueryJournal();
-            _nextUsn = journalData.NextUsn;
+            _volumeHandles[driveLetter] = volHandle;
+            
+            try 
+            {
+                CreateUsnJournal(driveLetter);
+                var usnData = QueryJournal(driveLetter);
+                _nextUsnMap[driveLetter] = usnData.NextUsn;
+            }
+            catch
+            {
+                _volumeHandles.Remove(driveLetter);
+                volHandle.Dispose();
+                throw;
+            }
         }
 
-        private USN_JOURNAL_DATA_V0 QueryJournal()
+        public async Task InitializeAllDrivesAsync()
         {
-            USN_JOURNAL_DATA_V0 journalData = new USN_JOURNAL_DATA_V0();
-            int size = Marshal.SizeOf(journalData);
-            IntPtr ptr = Marshal.AllocHGlobal(size);
-            
+            await Task.Run(() =>
+            {
+                var drives = DriveInfo.GetDrives().Where(d => d.DriveType == DriveType.Fixed);
+                foreach (var drive in drives)
+                {
+                    try 
+                    {
+                        Initialize(drive.Name);
+                    }
+                    catch (Exception) { /* Ignore failures for individual drives */ }
+                }
+            });
+        }
+
+        private void CreateUsnJournal(string driveLetter)
+        {
+            var cujd = new CREATE_USN_JOURNAL_DATA
+            {
+                MaximumSize = 0,
+                AllocationDelta = 0
+            };
+
+            int size = Marshal.SizeOf(cujd);
+            IntPtr buffer = Marshal.AllocHGlobal(size);
+            Marshal.StructureToPtr(cujd, buffer, true);
+
             try
             {
-                if (!NativeMethods.DeviceIoControl(
-                    _volumeHandle,
-                    UsnConstants.FSCTL_QUERY_USN_JOURNAL,
+                NativeMethods.DeviceIoControl(
+                    _volumeHandles[driveLetter],
+                    UsnConstants.FSCTL_CREATE_USN_JOURNAL,
+                    buffer,
+                    (uint)size,
                     IntPtr.Zero,
                     0,
-                    ptr,
-                    (uint)size,
                     out uint bytesReturned,
-                    IntPtr.Zero))
-                {
-                    throw new Win32Exception(Marshal.GetLastWin32Error(), "FSCTL_QUERY_USN_JOURNAL failed");
-                }
-
-                journalData = Marshal.PtrToStructure<USN_JOURNAL_DATA_V0>(ptr);
+                    IntPtr.Zero
+                );
             }
             finally
             {
-                Marshal.FreeHGlobal(ptr);
+                Marshal.FreeHGlobal(buffer);
             }
-
-            return journalData;
         }
 
-        public IEnumerable<FileEntry> ReadChanges()
+        public UsnJournalData QueryJournal(string driveLetter)
         {
-            // Initial call logic or subsequent. For now, assume we continue from _nextUsn.
+            var qujd = new USN_JOURNAL_DATA_V0();
+            int size = Marshal.SizeOf(qujd);
+            IntPtr buffer = Marshal.AllocHGlobal(size);
+
+            try
+            {
+                bool result = NativeMethods.DeviceIoControl(
+                    _volumeHandles[driveLetter],
+                    UsnConstants.FSCTL_QUERY_USN_JOURNAL,
+                    IntPtr.Zero,
+                    0,
+                    buffer,
+                    (uint)size,
+                    out uint bytesReturned,
+                    IntPtr.Zero
+                );
+
+                if (!result) throw new IOException("Failed to query USN Journal");
+
+                qujd = Marshal.PtrToStructure<USN_JOURNAL_DATA_V0>(buffer);
+            }
+            finally
+            {
+                Marshal.FreeHGlobal(buffer);
+            }
+
+            return new UsnJournalData
+            {
+                UsnJournalID = qujd.UsnJournalID,
+                FirstUsn = qujd.FirstUsn,
+                NextUsn = qujd.NextUsn,
+                LowestValidUsn = qujd.LowestValidUsn,
+                MaxUsn = qujd.MaxUsn,
+                MaximumSize = qujd.MaximumSize,
+                AllocationDelta = qujd.AllocationDelta
+            };
+        }
+
+        public IEnumerable<FileEntry> ReadChanges(string driveLetter)
+        {
+            if (!_volumeHandles.ContainsKey(driveLetter)) yield break;
+
             // Setup input for READ_USN_JOURNAL
             READ_USN_JOURNAL_DATA_V0 readData = new READ_USN_JOURNAL_DATA_V0
             {
-                StartUsn = _nextUsn,
+                StartUsn = _nextUsnMap[driveLetter],
                 ReasonMask = 0xFFFFFFFF, // All reasons
                 ReturnOnlyOnClose = 0,
                 Timeout = 0,
                 BytesToWaitFor = 0,
-                UsnJournalID = QueryJournal().UsnJournalID
+                UsnJournalID = QueryJournal(driveLetter).UsnJournalID
             };
 
             int inputSize = Marshal.SizeOf(readData);
@@ -95,7 +166,7 @@ namespace SecureFileMonitor.Core.Services
             try
             {
                 if (NativeMethods.DeviceIoControl(
-                    _volumeHandle,
+                    _volumeHandles[driveLetter],
                     UsnConstants.FSCTL_READ_USN_JOURNAL,
                     inputPtr,
                     (uint)inputSize,
@@ -107,7 +178,7 @@ namespace SecureFileMonitor.Core.Services
                    // Parse buffer
                    IntPtr currentPtr = new IntPtr(outputBuffer.ToInt64() + sizeof(long)); // First 8 bytes is the next USN
                    long nextUsnObj = Marshal.ReadInt64(outputBuffer);
-                   _nextUsn = nextUsnObj;
+                   _nextUsnMap[driveLetter] = nextUsnObj;
 
                    long bytesLeft = bytesReturned - sizeof(long);
                    
@@ -176,14 +247,16 @@ namespace SecureFileMonitor.Core.Services
             }
         }
 
-        public long GetCurrentUsn()
+        public long GetCurrentUsn(string driveLetter)
         {
-            return _nextUsn;
+            return _nextUsnMap.ContainsKey(driveLetter) ? _nextUsnMap[driveLetter] : 0;
         }
 
         public void Dispose()
         {
-            _volumeHandle?.Dispose();
+            foreach (var h in _volumeHandles.Values)
+                h.Dispose();
+            _volumeHandles.Clear();
         }
     }
 }

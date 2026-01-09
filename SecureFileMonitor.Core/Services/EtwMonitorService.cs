@@ -15,6 +15,14 @@ namespace SecureFileMonitor.Core.Services
         private bool _isDisposed;
 
         public event EventHandler<FileActivityEvent>? OnFileActivity;
+        public bool IgnoreInternalDatabase { get; set; } = true;
+
+        private bool IsInternalDatabase(string path)
+        {
+            // Simple check for now. Could be more robust by checking exact path of DB.
+            return path.Contains("secure_monitor.db", StringComparison.OrdinalIgnoreCase) ||
+                   path.Contains("log.txt", StringComparison.OrdinalIgnoreCase); 
+        }
 
         public void Start()
         {
@@ -37,7 +45,8 @@ namespace SecureFileMonitor.Core.Services
                         _session.Source.Kernel.FileIOCreate += (data) =>
                         {
                             if (string.IsNullOrEmpty(data.FileName)) return;
-                            
+                            if (IgnoreInternalDatabase && IsInternalDatabase(data.FileName)) return;
+
                             // Filter system files if needed, but for now capture all
                             OnFileActivity?.Invoke(this, new FileActivityEvent
                             {
@@ -46,13 +55,14 @@ namespace SecureFileMonitor.Core.Services
                                 ProcessName = data.ProcessName,
                                 FilePath = data.FileName,
                                 Operation = FileOperation.Create,
-                                UserName = Environment.UserName // Simplification. Real user ID needs more complex logic or context.
+                                UserName = Environment.UserName 
                             });
                         };
 
                         _session.Source.Kernel.FileIOWrite += (data) =>
                         {
                             if (string.IsNullOrEmpty(data.FileName)) return;
+                            if (IgnoreInternalDatabase && IsInternalDatabase(data.FileName)) return;
 
                             OnFileActivity?.Invoke(this, new FileActivityEvent
                             {
@@ -68,6 +78,7 @@ namespace SecureFileMonitor.Core.Services
                         _session.Source.Kernel.FileIODelete += (data) =>
                         {
                             if (string.IsNullOrEmpty(data.FileName)) return;
+                            if (IgnoreInternalDatabase && IsInternalDatabase(data.FileName)) return;
 
                              OnFileActivity?.Invoke(this, new FileActivityEvent
                             {

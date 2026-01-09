@@ -7,6 +7,7 @@ namespace SecureFileMonitor.Core.Services
     {
         void Start();
         void Stop();
+        bool IgnoreInternalDatabase { get; set; }
         event EventHandler<FileActivityEvent> OnFileActivity;
     }
 }

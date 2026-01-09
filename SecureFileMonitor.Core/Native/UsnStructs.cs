@@ -45,8 +45,16 @@ namespace SecureFileMonitor.Core.Native
         // FileName follows
     }
 
+    [StructLayout(LayoutKind.Sequential)]
+    public struct CREATE_USN_JOURNAL_DATA
+    {
+        public ulong MaximumSize;
+        public ulong AllocationDelta;
+    }
+
     public static class UsnConstants
     {
+        public const uint FSCTL_CREATE_USN_JOURNAL = 0x000900e7; // Correct code
         public const uint FSCTL_READ_USN_JOURNAL = 0x000900bb;
         public const uint FSCTL_QUERY_USN_JOURNAL = 0x000900f4;
         

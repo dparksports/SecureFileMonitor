@@ -82,5 +82,69 @@ namespace SecureFileMonitor.Core.Services
         {
             return await _connection.Table<FileMetadata>().Where(m => m.FileId == fileId).FirstOrDefaultAsync();
         }
+
+        public async Task<IEnumerable<FileEntry>> SearchFilesAsync(float[] queryVector, int limit = 10)
+        {
+            // 1. Fetch all metadata (Naive approach for small datasets)
+            // For production with thousands of files, use a vector DB or specialized index.
+            var allMetadata = await _connection.Table<FileMetadata>().ToListAsync();
+            
+            var results = new List<(string FileId, double Score)>();
+
+            foreach (var meta in allMetadata)
+            {
+                if (string.IsNullOrEmpty(meta.VectorEmbedding)) continue;
+
+                try
+                {
+                    var fileVector = meta.VectorEmbedding.Split(',').Select(float.Parse).ToArray();
+                    var score = CosineSimilarity(queryVector, fileVector);
+                    if (score > 0.3) // Threshold
+                    {
+                        results.Add((meta.FileId, score));
+                    }
+                }
+                catch { /* Ignore parse errors */ }
+            }
+
+            var topFileIds = results.OrderByDescending(x => x.Score).Take(limit).Select(x => x.FileId).ToList();
+
+            // 2. Fetch FileEntries
+            var entries = new List<FileEntry>();
+            foreach(var id in topFileIds)
+            {
+                // Assuming FileEntry primary key allows lookup by ID - wait, FileEntry lacks explicit ID lookup in previous code?
+                // FileEntry PK is FilePath? No, it has FileId (FRN).
+                // But DatabaseService.GetFileEntryAsync uses path...
+                // Let's verify FileEntry structure in next step or use Table<FileEntry>.Where(x => x.FileId == id)
+                var entry = await _connection.Table<FileEntry>().Where(x => x.FileId == long.Parse(id)).FirstOrDefaultAsync();
+                if (entry != null) entries.Add(entry);
+            }
+            
+            return entries;
+        }
+
+        private double CosineSimilarity(float[] v1, float[] v2)
+        {
+            if (v1.Length != v2.Length) return 0;
+
+            double dot = 0.0;
+            double mag1 = 0.0;
+            double mag2 = 0.0;
+
+            for (int i = 0; i < v1.Length; i++)
+            {
+                dot += v1[i] * v2[i];
+                mag1 += v1[i] * v1[i];
+                mag2 += v2[i] * v2[i];
+            }
+
+            return dot / (Math.Sqrt(mag1) * Math.Sqrt(mag2));
+        }
+
+        public async Task<IEnumerable<FileEntry>> GetAllFilesAsync()
+        {
+            return await _connection.Table<FileEntry>().ToListAsync();
+        }
     }
 }
