@@ -1,5 +1,7 @@
 # Secure File Monitor
 
+![Live Activity Mockup](assets/live_activity_mockup.png)
+
 **Secure File Monitor** is a high-security, native Windows application designed to provide comprehensive, real-time monitoring of all file activities across mounted drives. Built with a focus on integrity verification and forensic visibility, it tracks creations, modifications, and deletions with precision.
 
 ## Key Features
