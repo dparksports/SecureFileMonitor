@@ -56,8 +56,10 @@ namespace SecureFileMonitor.Core.Services
             {
                 progress?.Report($"Scanning: {directory.FullName}");
 
+                var enumOptions = new EnumerationOptions { AttributesToSkip = 0, RecurseSubdirectories = false, IgnoreInaccessible = true };
+
                 // Process files
-                foreach (var file in directory.EnumerateFiles())
+                foreach (var file in directory.EnumerateFiles("*", enumOptions))
                 {
                     if (cancellationToken.IsCancellationRequested) return;
 
@@ -87,7 +89,7 @@ namespace SecureFileMonitor.Core.Services
                 }
 
                 // Recurse
-                foreach (var subDir in directory.EnumerateDirectories())
+                foreach (var subDir in directory.EnumerateDirectories("*", enumOptions))
                 {
                     bool isReparse = (subDir.Attributes & FileAttributes.ReparsePoint) != 0;
                     

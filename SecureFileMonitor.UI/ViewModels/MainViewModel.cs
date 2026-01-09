@@ -76,7 +76,7 @@ namespace SecureFileMonitor.UI.ViewModels
 
         // Sorting
         [ObservableProperty]
-        private string _sortBy = "Name"; // Name, CreationTime, LastModified
+        private string _sortBy = "LastModified"; // Default to LastModified to show actual work first
 
         // File Type Filtering
         [ObservableProperty]
@@ -89,6 +89,14 @@ namespace SecureFileMonitor.UI.ViewModels
         [ObservableProperty]
         private DateTime? _dateFilterEnd;
 
+        [ObservableProperty]
+        private int _selectedItemsCount;
+
+        [ObservableProperty]
+        private long _selectedItemsSize;
+
+        public string[] SortByOptions { get; } = { "Name", "CreationTime", "LastModified", "Size" };
+
         partial void OnSortByChanged(string value) => ApplyFilters();
         partial void OnFileTypeFilterChanged(string value) => ApplyFilters();
         partial void OnDateFilterStartChanged(DateTime? value) => ApplyFilters();
@@ -100,6 +108,8 @@ namespace SecureFileMonitor.UI.ViewModels
         {
             CurrentViewName = viewName;
         }
+
+        public List<string> FileTypeOptions => new[] { "All" }.Concat(FileTypeExtensions.Keys).ToList();
 
         private static readonly Dictionary<string, string[]> FileTypeExtensions = new()
         {
@@ -115,7 +125,7 @@ namespace SecureFileMonitor.UI.ViewModels
         {
             var query = AllFiles.AsEnumerable();
 
-            // Ignore Rules Filter
+            // 1. Ignore List Filter (Hide ignored files if list enabled)
             if (EnableIgnoreList)
             {
                 var ignoreRules = CurrentIgnoreRules.ToList();
@@ -124,14 +134,16 @@ namespace SecureFileMonitor.UI.ViewModels
                     (r.IsDirectory && f.FilePath.StartsWith(r.Path, StringComparison.OrdinalIgnoreCase))));
             }
 
-            // Type Filter
+            // 2. Type Filter
             if (FileTypeFilter != "All" && FileTypeExtensions.ContainsKey(FileTypeFilter))
             {
                 var extensions = FileTypeExtensions[FileTypeFilter];
-                query = query.Where(f => extensions.Contains(f.FileExtension.ToLowerInvariant()));
+                query = query.Where(f => extensions.Any(ext => 
+                    f.FileExtension.Equals(ext, StringComparison.OrdinalIgnoreCase) || 
+                    f.FileExtension.Equals(ext.TrimStart('.'), StringComparison.OrdinalIgnoreCase)));
             }
 
-            // Date Filter
+            // 3. Date Filter
             if (DateFilterStart.HasValue)
             {
                 query = query.Where(f => f.CreationTime >= DateFilterStart.Value || f.LastModified >= DateFilterStart.Value);
@@ -141,17 +153,33 @@ namespace SecureFileMonitor.UI.ViewModels
                 query = query.Where(f => f.CreationTime <= DateFilterEnd.Value || f.LastModified <= DateFilterEnd.Value);
             }
 
-            // Sorting
+            // 4. Calculate IsIgnored (for display)
+            // We do this BEFORE paging/limiting but AFTER filtering? 
+            // Actually, we want to know if displayed files are ignored.
+            // But if we filtered OUT ignored files above, they won't be here.
+            // If EnableIgnoreList is FALSE, we show them, so we need to mark them.
+            // If EnableIgnoreList is TRUE, we hid them, so IsIgnored is effectively false for all remaining (unless logic is complex).
+            // Let's just calculate it for the result set.
+            var rulesSnapshot = CurrentIgnoreRules.ToList();
+            
+            // 5. Sorting
             query = SortBy switch
             {
                 "CreationTime" => query.OrderByDescending(f => f.CreationTime),
                 "LastModified" => query.OrderByDescending(f => f.LastModified),
+                "Size" => query.OrderByDescending(f => f.FileSize),
                 _ => query.OrderBy(f => f.FileName)
             };
 
+            // 6. Execute and Populate
             FilteredFiles.Clear();
-            foreach (var file in query.Take(1000)) // Limit for UI performance
+            foreach (var file in query.Take(5000))
             {
+                // Set IsIgnored Status
+                file.IsIgnored = rulesSnapshot.Any(r => 
+                    file.FilePath.Equals(r.Path, StringComparison.OrdinalIgnoreCase) || 
+                    (r.IsDirectory && file.FilePath.StartsWith(r.Path, StringComparison.OrdinalIgnoreCase)));
+
                 FilteredFiles.Add(file);
             }
         }
@@ -176,6 +204,7 @@ namespace SecureFileMonitor.UI.ViewModels
                 {
                     AllFiles.Add(f);
                 }
+
                 ApplyFilters();
                 
                 // Calculate statistics
@@ -186,11 +215,15 @@ namespace SecureFileMonitor.UI.ViewModels
                 LastScannedTime = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
                 
                 StatusMessage = $"Loaded {AllFiles.Count} files.";
+
             }
+
             catch (Exception ex)
             {
                 StatusMessage = $"Load Error: {ex.Message}";
+
             }
+
         }
 
         [RelayCommand]
@@ -256,13 +289,18 @@ namespace SecureFileMonitor.UI.ViewModels
                     await _scannerService.ScanDriveAsync(drive.Name, ScanReparseFolders, new Progress<string>(s => StatusMessage = s), CancellationToken.None);
                 }
 
+
                 StatusMessage = "Scan Complete.";
                 await LoadAllFiles(); // Auto-refresh
+
             }
+
             catch (Exception ex)
             {
                 StatusMessage = $"Scan Error: {ex.Message}";
+
             }
+
         }
 
         [RelayCommand]
@@ -276,9 +314,26 @@ namespace SecureFileMonitor.UI.ViewModels
                 await _dbService.AddIgnoreRuleAsync(rule);
             }
 
+
             await LoadAllFiles(); // Refresh Vault to hide ignored files
             await RefreshIgnoreList(); // Update Ignore List view
             StatusMessage = $"Ignored {selectedItems.Count} files.";
+        }
+
+        [RelayCommand]
+        private async Task UnignoreSelectedFiles(System.Collections.IList? selectedItems)
+        {
+            if (selectedItems == null || selectedItems.Count == 0) return;
+
+            foreach (var item in selectedItems.Cast<FileEntry>().ToList())
+            {
+                 await _dbService.RemoveIgnoreRuleAsync(item.FilePath);
+            }
+
+
+            await LoadAllFiles(); 
+            await RefreshIgnoreList(); 
+            StatusMessage = $"Unignored {selectedItems.Count} files.";
         }
 
         [RelayCommand]
@@ -297,31 +352,37 @@ namespace SecureFileMonitor.UI.ViewModels
             public List<string> ParentHierarchy { get; set; } = new();
         }
 
-        public IEnumerable<IgnoreGroup> IgnoredGroups
+        public List<IgnoreGroup> IgnoredGroups
         {
             get
             {
-                var groups = new Dictionary<string, IgnoreGroup>();
+                var groupsList = new List<IgnoreGroup>();
+                var groupsDict = new Dictionary<string, IgnoreGroup>();
                 foreach (var rule in CurrentIgnoreRules)
                 {
-                    string parent = Path.GetDirectoryName(rule.Path) ?? rule.Path;
-                    if (!groups.ContainsKey(parent))
+                    string parent = rule.IsDirectory ? rule.Path : (Path.GetDirectoryName(rule.Path) ?? rule.Path);
+                    if (!groupsDict.ContainsKey(parent))
                     {
                         var group = new IgnoreGroup { ParentPath = parent };
-                        
-                        // Build hierarchy
                         string? current = parent;
-                        while (!string.IsNullOrEmpty(current))
+                        int depth = 0;
+                        while (!string.IsNullOrEmpty(current) && depth < 5)
                         {
                             group.ParentHierarchy.Add(current);
                             current = Path.GetDirectoryName(current);
+                            depth++;
                         }
-                        groups[parent] = group;
+
+                        groupsDict[parent] = group;
+                        groupsList.Add(group);
                     }
-                    groups[parent].Rules.Add(rule);
+
+                    groupsDict[parent].Rules.Add(rule);
                 }
-                return groups.Values;
+                return groupsList;
+
             }
+
         }
 
         [RelayCommand]
@@ -347,6 +408,7 @@ namespace SecureFileMonitor.UI.ViewModels
             {
                 await _dbService.RemoveIgnoreRuleAsync(rule.Path);
             }
+
             await RefreshIgnoreList();
             await LoadAllFiles();
         }
@@ -363,10 +425,28 @@ namespace SecureFileMonitor.UI.ViewModels
                 await _dbService.RemoveIgnoreRuleAsync(child.Path);
             }
 
+
             await _dbService.AddIgnoreRuleAsync(new IgnoreRule { Path = newParentPath, IsDirectory = true });
             await RefreshIgnoreList();
             await LoadAllFiles();
             StatusMessage = $"Ignoring directory: {newParentPath}";
+        }
+
+        [RelayCommand]
+        private void UpdateSelectionTally(System.Collections.IList? selectedItems)
+        {
+            if (selectedItems == null)
+            {
+                SelectedItemsCount = 0;
+                SelectedItemsSize = 0;
+                return;
+
+            }
+
+
+            var items = selectedItems.Cast<FileEntry>().ToList();
+            SelectedItemsCount = items.Count;
+            SelectedItemsSize = items.Sum(f => f.FileSize);
         }
 
         [RelayCommand]
@@ -375,21 +455,10 @@ namespace SecureFileMonitor.UI.ViewModels
             if (selectedItems == null) return;
             var files = selectedItems.Cast<FileEntry>().ToList();
             
-            foreach (var file in files)
-            {
-                string ext = file.FileExtension.ToLowerInvariant();
-                if (FileTypeExtensions["Audio"].Contains(ext) || FileTypeExtensions["Video"].Contains(ext))
-                {
-                    if (!TranscribeQueue.Any(t => t.FilePath == file.FilePath && t.Status != TranscriptionStatus.Completed))
-                    {
-                        TranscribeQueue.Add(new TranscriptionTask { FilePath = file.FilePath, FileName = file.FileName });
-                    }
-                }
-            }
-
             _ = ProcessTranscriptionQueueAsync();
             CurrentViewName = "TRANSCRIBE";
         }
+
         [RelayCommand]
         private async Task TagSelectedFiles(System.Collections.IList? selectedItems)
         {
@@ -397,49 +466,100 @@ namespace SecureFileMonitor.UI.ViewModels
             SelectedFile = selectedItems.Cast<FileEntry>().FirstOrDefault();
             CurrentViewName = "DETAILS";
         }
-
+        
         [RelayCommand]
         private void OpenInExplorer(FileEntry? file)
         {
             if (file == null) return;
             string path = file.FilePath;
-            if (File.Exists(path))
+            try
             {
-                Process.Start("explorer.exe", $"/select,\"{path}\"");
+                if (File.Exists(path))
+                {
+                    Process.Start(new ProcessStartInfo("explorer.exe", $"/select,\"{path}\"") { UseShellExecute = true });
+                }
+                else if (Directory.Exists(path))
+                {
+                    Process.Start(new ProcessStartInfo("explorer.exe", $"\"{path}\"") { UseShellExecute = true });
+                }
             }
-            else if (Directory.Exists(path))
+            catch (Exception ex)
             {
-                Process.Start("explorer.exe", $"\"{path}\"");
+                StatusMessage = $"Error opening Explorer: {ex.Message}";
+
             }
+
         }
 
         [RelayCommand]
         private void OpenInVsCode(FileEntry? file)
         {
             if (file == null) return;
-            Process.Start(new ProcessStartInfo
+            try
             {
-                FileName = "code",
-                Arguments = $"\"{file.FilePath}\"",
-                UseShellExecute = true,
-                CreateNoWindow = true
-            });
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = "code.cmd", // Use code.cmd specifically for better CMD resolution
+                    Arguments = $"\"{file.FilePath}\"",
+                    UseShellExecute = true,
+                    CreateNoWindow = true
+                });
+
+            }
+
+            catch
+            {
+                try
+                {
+                    // Fallback to "code"
+                    Process.Start(new ProcessStartInfo { FileName = "code", Arguments = $"\"{file.FilePath}\"", UseShellExecute = true });
+                }
+                catch (Exception ex)
+                {
+                    StatusMessage = $"Error opening VS Code: {ex.Message}";
+                }
+
+
+            }
+
         }
 
         [RelayCommand]
         private void OpenInPowerShell(FileEntry? file)
         {
             if (file == null) return;
-            string dir = File.Exists(file.FilePath) ? Path.GetDirectoryName(file.FilePath)! : file.FilePath;
-            Process.Start("powershell.exe", $"-NoExit -Command \"Set-Location -Path '{dir}'\"");
+            try
+            {
+                string dir = File.Exists(file.FilePath) ? Path.GetDirectoryName(file.FilePath)! : file.FilePath;
+                Process.Start(new ProcessStartInfo("powershell.exe", $"-NoExit -Command \"Set-Location -Path '{dir}'\"") { UseShellExecute = true });
+
+            }
+
+            catch (Exception ex)
+            {
+                StatusMessage = $"Error opening PowerShell: {ex.Message}";
+
+            }
+
         }
 
         [RelayCommand]
         private void OpenInCmd(FileEntry? file)
         {
             if (file == null) return;
-            string dir = File.Exists(file.FilePath) ? Path.GetDirectoryName(file.FilePath)! : file.FilePath;
-            Process.Start("cmd.exe", $"/K \"cd /d \"{dir}\"\"");
+            try
+            {
+                string dir = File.Exists(file.FilePath) ? Path.GetDirectoryName(file.FilePath)! : file.FilePath;
+                Process.Start(new ProcessStartInfo("cmd.exe", $"/K \"cd /d \"{dir}\"\"") { UseShellExecute = true });
+
+            }
+
+            catch (Exception ex)
+            {
+                StatusMessage = $"Error opening CMD: {ex.Message}";
+
+            }
+
         }
 
         private bool _isProcessingQueue = false;
@@ -476,11 +596,16 @@ namespace SecureFileMonitor.UI.ViewModels
                         task.ErrorMessage = ex.Message;
                     }
                 }
+
+
             }
+
             finally
             {
                 _isProcessingQueue = false;
+
             }
+
         }
 
         public MainViewModel(IUsnJournalService usnService, IEtwMonitorService etwService, IDatabaseService dbService, IAiService aiService, IFileScannerService scannerService)
@@ -529,12 +654,17 @@ namespace SecureFileMonitor.UI.ViewModels
                 {
                     DuplicateFiles.Add(file);
                 }
+
                 StatusMessage = $"Found {DuplicateFiles.Count} duplicate candidates.";
+
             }
+
             catch (Exception ex)
             {
                 StatusMessage = $"Duplicate Scan Error: {ex.Message}";
+
             }
+
         }
 
         [RelayCommand]
@@ -556,6 +686,7 @@ namespace SecureFileMonitor.UI.ViewModels
                     return;
                 }
 
+
                 var vector = embeddingStr.Split(',').Select(float.Parse).ToArray();
                 
                 StatusMessage = "Searching database...";
@@ -566,12 +697,17 @@ namespace SecureFileMonitor.UI.ViewModels
                 {
                     SearchResults.Add(file);
                 }
+
                 StatusMessage = $"Found {SearchResults.Count} relevant files.";
+
             }
+
             catch (Exception ex)
             {
                 StatusMessage = $"Search Error: {ex.Message}";
+
             }
+
         }
 
         [RelayCommand]

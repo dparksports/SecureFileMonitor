@@ -38,4 +38,31 @@ namespace SecureFileMonitor.UI.Converters
             throw new NotImplementedException();
         }
     }
+
+    public class FileSizeConverter : IValueConverter
+    {
+        private static readonly string[] Units = { "B", "KB", "MB", "GB", "TB" };
+
+        public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+        {
+            if (value is long size)
+            {
+                if (size == 0) return "0 B";
+                int unitIndex = 0;
+                double doubleSize = size;
+                while (doubleSize >= 1024 && unitIndex < Units.Length - 1)
+                {
+                    doubleSize /= 1024;
+                    unitIndex++;
+                }
+                return $"{doubleSize:F2} {Units[unitIndex]}";
+            }
+            return "0 B";
+        }
+
+        public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            throw new NotImplementedException();
+        }
+    }
 }
