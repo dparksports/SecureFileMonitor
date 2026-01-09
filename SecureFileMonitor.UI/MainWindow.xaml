@@ -16,6 +16,7 @@
         <conv:ViewToColorConverter x:Key="ViewToColorConverter"/>
         <conv:InverseBooleanConverter x:Key="InverseBooleanConverter"/>
         <conv:FileSizeConverter x:Key="FileSizeConverter"/>
+        <conv:BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter"/>
         <conv:BindingProxy x:Key="Proxy" Data="{Binding}"/>
         
         <Style TargetType="DataGridColumnHeader">
@@ -27,11 +28,7 @@
             <Setter Property="BorderBrush" Value="#444"/>
         </Style>
 
-        <Style TargetType="ComboBox">
-            <Setter Property="Background" Value="#333"/>
-            <Setter Property="Foreground" Value="White"/>
-            <Setter Property="BorderBrush" Value="#555"/>
-        </Style>
+
 
         <Style TargetType="DatePicker">
             <Setter Property="Background" Value="#333"/>
@@ -71,30 +68,6 @@
                     </Border>
                 </StackPanel>
 
-                <!-- Monitoring Controls -->
-                <TextBlock Text="MONITORING" FontWeight="Bold" Foreground="Gray" Margin="0,0,0,5" FontSize="10"/>
-                <Border Background="#222" CornerRadius="4" Padding="10" Margin="0,0,0,10">
-                    <StackPanel>
-                        <StackPanel Orientation="Horizontal" Margin="0,0,0,5">
-                            <Button Command="{Binding StartMonitoringCommand}" Content="Start" Background="Green" Foreground="White" Padding="10,2" Margin="0,0,5,0" FontSize="12" IsEnabled="{Binding IsMonitoring, Converter={StaticResource InverseBooleanConverter}}"/>
-                            <Button Command="{Binding StopMonitoringCommand}" Content="Stop" Background="Red" Foreground="White" Padding="10,2" FontSize="12" IsEnabled="{Binding IsMonitoring}"/>
-                        </StackPanel>
-                        <CheckBox IsChecked="{Binding MonitorInternalDatabase}" Content="Monitor Internal DB" Foreground="Gray" FontSize="11"/>
-                        <CheckBox IsChecked="{Binding ScanReparseFolders}" Content="Scan Reparse Folders" Foreground="Gray" FontSize="11" Margin="0,2,0,0"/>
-                    </StackPanel>
-                </Border>
-
-                <!-- Stats Border -->
-                <Border Background="#222" CornerRadius="4" Padding="10" Margin="0,0,0,10">
-                    <StackPanel>
-                        <TextBlock Text="Monitor Status" FontWeight="Bold" Foreground="White" FontSize="12"/>
-                        <TextBlock Text="{Binding IsMonitoring, StringFormat='Active: {0}'}" Foreground="SpringGreen"/>
-                        <Separator Background="#333" Margin="0,5"/>
-                        <TextBlock Text="Processing" FontWeight="Bold" Foreground="White" FontSize="12"/>
-                        <TextBlock Text="Tracking changes..." Foreground="Gray"/>
-                    </StackPanel>
-                </Border>
-                
                 <!-- Navigation -->
                 <TextBlock Text="NAVIGATION" FontWeight="Bold" Foreground="Gray" Margin="0,10,0,5" FontSize="10"/>
                 <Button Command="{Binding SwitchViewCommand}" CommandParameter="VAULT" Content="📁 VAULT" 
@@ -109,9 +82,6 @@
                 <Button Command="{Binding SwitchViewCommand}" CommandParameter="SEARCH" Content="🔍 SEMANTIC SEARCH" 
                         Background="{Binding CurrentViewName, Converter={StaticResource ViewToColorConverter}, ConverterParameter=SEARCH}" 
                         Foreground="White" Padding="10" Margin="0,2,0,0" HorizontalContentAlignment="Left" BorderThickness="0"/>
-                <Button Command="{Binding SwitchViewCommand}" CommandParameter="DETAILS" Content="ℹ️ FILE DETAILS" 
-                        Background="{Binding CurrentViewName, Converter={StaticResource ViewToColorConverter}, ConverterParameter=DETAILS}" 
-                        Foreground="White" Padding="10" Margin="0,2,0,0" HorizontalContentAlignment="Left" BorderThickness="0"/>
                 <Button Command="{Binding SwitchViewCommand}" CommandParameter="TRANSCRIBE" Content="🎙️ TRANSCRIBE" 
                         Background="{Binding CurrentViewName, Converter={StaticResource ViewToColorConverter}, ConverterParameter=TRANSCRIBE}" 
                         Foreground="White" Padding="10" Margin="0,2,0,0" HorizontalContentAlignment="Left" BorderThickness="0"/>
@@ -119,11 +89,6 @@
                 <Button Command="{Binding SwitchViewCommand}" CommandParameter="IGNORE_LIST" Content="🚫 IGNORE LIST" 
                         Background="{Binding CurrentViewName, Converter={StaticResource ViewToColorConverter}, ConverterParameter=IGNORE_LIST}" 
                         Foreground="White" Padding="10" Margin="0,2,0,0" HorizontalContentAlignment="Left" BorderThickness="0"/>
-
-                <!-- Action Buttons -->
-                <TextBlock Text="AI SERVICES" FontWeight="Bold" Foreground="Gray" Margin="0,20,0,5" FontSize="10"/>
-                <Button Command="{Binding DownloadModelsCommand}" Content="⬇️ Download AI Models" 
-                        Background="#2E7D32" Foreground="White" Padding="10" Margin="0,5,0,0" HorizontalContentAlignment="Left"/>
             </StackPanel>
 
             <!-- Main Content Area -->
@@ -145,112 +110,308 @@
                             
                             <StackPanel Orientation="Horizontal">
                                 <Button Command="{Binding ScanDriveCommand}" Content="📂 Scan Drive" 
-                                        Background="#333" Foreground="White" Padding="10,5" Margin="0,0,10,0"/>
+                                        Background="#333" Foreground="White" Padding="10,5" Margin="0,0,5,0"/>
+                                <Button Command="{Binding StopScanCommand}" Content="⏹️ Stop" 
+                                        Background="#8B0000" Foreground="White" Padding="10,5" Margin="0,0,10,0"/>
                                 <Button Command="{Binding LoadAllFilesCommand}" Content="📋 Refresh List" 
                                         Background="#333" Foreground="White" Padding="10,5" Margin="0,0,15,0"/>
+
+                                <Separator Width="1" Background="#333" Margin="10,0"/>
+
+                                <ToggleButton IsChecked="{Binding IsTranscribeViewVisible}" Content="🎙️ Transcribe" 
+                                              Background="{Binding IsTranscribeViewVisible, Converter={StaticResource ViewToColorConverter}, ConverterParameter=TRUE}" 
+                                              Foreground="White" Padding="10,5" Margin="10,0,0,0"/>
+
+                                <ToggleButton IsChecked="{Binding IsFileDetailsVisible}" Content="ℹ️ Details" 
+                                              Background="{Binding IsFileDetailsVisible, Converter={StaticResource ViewToColorConverter}, ConverterParameter=TRUE}" 
+                                              Foreground="White" Padding="10,5" Margin="10,0,0,0"/>
+
+                                <CheckBox IsChecked="{Binding EnableIgnoreList}" Content="Enable Ignore List" VerticalAlignment="Center" Foreground="White" FontWeight="SemiBold" Margin="10,0,0,0"/>
                             </StackPanel>
 
                             <StackPanel Grid.Column="1" Orientation="Horizontal">
                                 <TextBlock Text="SORT BY:" Foreground="White" FontWeight="Bold" VerticalAlignment="Center" Margin="0,0,5,0" FontSize="11"/>
                                 <ComboBox ItemsSource="{Binding SortByOptions}" SelectedItem="{Binding SortBy}" 
-                                          Width="120" Background="#333" Foreground="White" BorderThickness="1" BorderBrush="#555" Margin="0,0,10,0"/>
+                                          Width="120" Margin="0,0,10,0"/>
                                 
                                 <TextBlock Text="Type:" FontWeight="Bold" VerticalAlignment="Center" Margin="10,0,5,0" Foreground="White" FontSize="11"/>
                                 <ComboBox ItemsSource="{Binding FileTypeOptions}" SelectedItem="{Binding FileTypeFilter}" 
-                                          Width="100" Background="#333" Foreground="White" BorderThickness="1" BorderBrush="SpringGreen" Padding="5,2">
-                                    <ComboBox.ItemContainerStyle>
-                                        <Style TargetType="ComboBoxItem">
-                                            <Setter Property="Background" Value="#333"/>
-                                            <Setter Property="Foreground" Value="White"/>
-                                            <Setter Property="BorderThickness" Value="0"/>
-                                        </Style>
-                                    </ComboBox.ItemContainerStyle>
-                                </ComboBox>
+                                          Width="100" Padding="5,2"/>
+                                
                                 <TextBlock Text="Date Range:" FontWeight="Bold" VerticalAlignment="Center" Margin="10,0,5,0" Foreground="White" FontSize="11"/>
                                 <DatePicker SelectedDate="{Binding DateFilterStart}" Width="110" Background="#333" Foreground="Black" BorderThickness="1" BorderBrush="#555" Margin="0,0,5,0"/>
                                 <TextBlock Text="to" VerticalAlignment="Center" Margin="0,0,5,0" Foreground="White"/>
                                 <DatePicker SelectedDate="{Binding DateFilterEnd}" Width="110" Foreground="Black" Margin="0,0,10,0"/>
-
-                                <CheckBox IsChecked="{Binding EnableIgnoreList}" Content="Enable Ignore List" VerticalAlignment="Center" Foreground="White" FontWeight="SemiBold" Margin="10,0,0,0"/>
                             </StackPanel>
                         </Grid>
                         
-                        <DataGrid x:Name="VaultDataGrid" Grid.Row="1" ItemsSource="{Binding FilteredFiles}" AutoGenerateColumns="False" 
-                                  Background="Transparent" BorderThickness="0" HeadersVisibility="Column"
-                                  IsReadOnly="True" RowBackground="#222" AlternatingRowBackground="#2A2A2A" Foreground="White"
-                                  SelectedItem="{Binding SelectedFile}" SelectionMode="Extended">
-                            <i:Interaction.Triggers>
-                                <i:EventTrigger EventName="SelectionChanged">
-                                    <i:InvokeCommandAction Command="{Binding UpdateSelectionTallyCommand}" 
-                                                           CommandParameter="{Binding SelectedItems, ElementName=VaultDataGrid}"/>
-                                </i:EventTrigger>
-                            </i:Interaction.Triggers>
-                            <DataGrid.ContextMenu>
-                                <ContextMenu>
-                                    <MenuItem Header="🏷️ Tag Selected Files" 
-                                              Command="{Binding Data.TagSelectedFilesCommand, Source={StaticResource Proxy}}"
-                                              CommandParameter="{Binding Path=PlacementTarget.SelectedItems, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
-                                    <MenuItem Header="🎙️ Transcribe Selected" 
-                                              Command="{Binding Data.TranscribeSelectedFilesCommand, Source={StaticResource Proxy}}"
-                                              CommandParameter="{Binding Path=PlacementTarget.SelectedItems, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
-                                    <Separator/>
-                                    <MenuItem Header="🚫 Ignore these files" 
-                                              Command="{Binding Data.IgnoreSelectedFilesCommand, Source={StaticResource Proxy}}"
-                                              CommandParameter="{Binding Path=PlacementTarget.SelectedItems, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
-                                    <MenuItem Header="✅ Unignore these files" 
-                                              Command="{Binding Data.UnignoreSelectedFilesCommand, Source={StaticResource Proxy}}"
-                                              CommandParameter="{Binding Path=PlacementTarget.SelectedItems, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
-                                    <Separator/>
-                                    <MenuItem Header="📂 Open in Explorer" 
-                                              Command="{Binding Data.OpenInExplorerCommand, Source={StaticResource Proxy}}"
-                                              CommandParameter="{Binding Path=PlacementTarget.SelectedItem, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
-                                    <MenuItem Header="💻 Open in VS Code" 
-                                              Command="{Binding Data.OpenInVsCodeCommand, Source={StaticResource Proxy}}"
-                                              CommandParameter="{Binding Path=PlacementTarget.SelectedItem, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
-                                    <MenuItem Header="🐚 Open in PowerShell" 
-                                              Command="{Binding Data.OpenInPowerShellCommand, Source={StaticResource Proxy}}"
-                                              CommandParameter="{Binding Path=PlacementTarget.SelectedItem, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
-                                    <MenuItem Header="📟 Open in CMD" 
-                                              Command="{Binding Data.OpenInCmdCommand, Source={StaticResource Proxy}}"
-                                              CommandParameter="{Binding Path=PlacementTarget.SelectedItem, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
-                                </ContextMenu>
-                            </DataGrid.ContextMenu>
-                            <DataGrid.Columns>
-                                <DataGridTextColumn Header="Name" Binding="{Binding FileName}" Width="200">
-                                    <DataGridTextColumn.ElementStyle>
-                                        <Style TargetType="TextBlock">
-                                            <Setter Property="FontWeight" Value="Bold"/>
-                                        </Style>
-                                    </DataGridTextColumn.ElementStyle>
-                                </DataGridTextColumn>
-                                <DataGridTextColumn Header="Path" Binding="{Binding FilePath}" Width="*"/>
-                                <DataGridTextColumn Header="Type" Binding="{Binding FileType}" Width="120"/>
-                                <DataGridTextColumn Header="Size" Binding="{Binding FileSize, Converter={StaticResource FileSizeConverter}}" Width="100"/>
-                                <DataGridTextColumn Header="Created" Binding="{Binding CreationTime, StringFormat=yyyy-MM-dd HH:mm}" Width="140"/>
-                                <DataGridTextColumn Header="Modified" Binding="{Binding LastModified, StringFormat=yyyy-MM-dd HH:mm}" Width="140"/>
-                            </DataGrid.Columns>
-                        </DataGrid>
+                        <Grid Grid.Row="1">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+
+                            <DataGrid x:Name="VaultDataGrid" Grid.Column="0" ItemsSource="{Binding FilteredFiles}" AutoGenerateColumns="False" 
+                                      Background="Transparent" BorderThickness="0" HeadersVisibility="Column"
+                                      IsReadOnly="True" RowBackground="#222" AlternatingRowBackground="#2A2A2A" Foreground="White"
+                                      SelectedItem="{Binding SelectedFile}" SelectionMode="Extended">
+                                <i:Interaction.Triggers>
+                                    <i:EventTrigger EventName="SelectionChanged">
+                                        <i:InvokeCommandAction Command="{Binding UpdateSelectionTallyCommand}" 
+                                                               CommandParameter="{Binding SelectedItems, ElementName=VaultDataGrid}"/>
+                                    </i:EventTrigger>
+                                </i:Interaction.Triggers>
+                                <DataGrid.ContextMenu>
+                                    <ContextMenu>
+                                        <MenuItem Header="🏷️ Tag Selected Files" 
+                                                  Command="{Binding Data.TagSelectedFilesCommand, Source={StaticResource Proxy}}"
+                                                  CommandParameter="{Binding Path=PlacementTarget.SelectedItems, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
+                                        <MenuItem Header="🎙️ Transcribe Selected" 
+                                                  Command="{Binding Data.TranscribeSelectedFilesCommand, Source={StaticResource Proxy}}"
+                                                  CommandParameter="{Binding Path=PlacementTarget.SelectedItems, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
+                                        <Separator/>
+                                        <MenuItem Header="🚫 Ignore these files" 
+                                                  Command="{Binding Data.IgnoreSelectedFilesCommand, Source={StaticResource Proxy}}"
+                                                  CommandParameter="{Binding Path=PlacementTarget.SelectedItems, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
+                                        <MenuItem Header="✅ Unignore these files" 
+                                                  Command="{Binding Data.UnignoreSelectedFilesCommand, Source={StaticResource Proxy}}"
+                                                  CommandParameter="{Binding Path=PlacementTarget.SelectedItems, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
+                                        <Separator/>
+                                        <MenuItem Header="📂 Open in Explorer" 
+                                                  Command="{Binding Data.OpenInExplorerCommand, Source={StaticResource Proxy}}"
+                                                  CommandParameter="{Binding Path=PlacementTarget.SelectedItem, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
+                                        <MenuItem Header="💻 Open in VS Code" 
+                                                  Command="{Binding Data.OpenInVsCodeCommand, Source={StaticResource Proxy}}"
+                                                  CommandParameter="{Binding Path=PlacementTarget.SelectedItem, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
+                                        <MenuItem Header="🐚 Open in PowerShell" 
+                                                  Command="{Binding Data.OpenInPowerShellCommand, Source={StaticResource Proxy}}"
+                                                  CommandParameter="{Binding Path=PlacementTarget.SelectedItem, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
+                                        <MenuItem Header="📟 Open in CMD" 
+                                                  Command="{Binding Data.OpenInCmdCommand, Source={StaticResource Proxy}}"
+                                                  CommandParameter="{Binding Path=PlacementTarget.SelectedItem, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
+                                    </ContextMenu>
+                                </DataGrid.ContextMenu>
+                                <DataGrid.Columns>
+                                    <DataGridCheckBoxColumn Header="Ignored" Binding="{Binding IsIgnored}" Width="60"/>
+                                    <DataGridTextColumn Header="Name" Binding="{Binding FileName}" Width="200">
+                                        <DataGridTextColumn.ElementStyle>
+                                            <Style TargetType="TextBlock">
+                                                <Setter Property="FontWeight" Value="Bold"/>
+                                            </Style>
+                                        </DataGridTextColumn.ElementStyle>
+                                    </DataGridTextColumn>
+                                    <DataGridTextColumn Header="Path" Binding="{Binding FilePath}" Width="*"/>
+                                    <DataGridTextColumn Header="Type" Binding="{Binding FileType}" Width="120"/>
+                                    <DataGridTextColumn Header="Size" Binding="{Binding FileSize, Converter={StaticResource FileSizeConverter}}" Width="100"/>
+                                    <DataGridTextColumn Header="Created" Binding="{Binding CreationTime, StringFormat=yyyy-MM-dd HH:mm}" Width="140"/>
+                                    <DataGridTextColumn Header="Modified" Binding="{Binding LastModified, StringFormat=yyyy-MM-dd HH:mm}" Width="140"/>
+                                </DataGrid.Columns>
+                            </DataGrid>
+
+                            <!-- Side Panels (Stacked Horizontally) -->
+                            <StackPanel Grid.Column="1" Orientation="Horizontal">
+                                
+                                <!-- Transcription Side Panel -->
+                                <Border Width="350" Background="#1A1A1A" BorderBrush="#333" BorderThickness="1,0,0,0" Margin="10,0,0,0"
+                                        Visibility="{Binding IsTranscribeViewVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                    <Grid Margin="10">
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="*"/>
+                                        </Grid.RowDefinitions>
+                                        <TextBlock Text="TRANSCRIPTION HISTORIAL" FontWeight="Bold" Foreground="Gray" Margin="0,0,0,10"/>
+                                        
+                                        <StackPanel Grid.Row="1" Margin="0,0,0,10">
+                                            <TextBox Text="{Binding TranscribedFileSearchQuery, UpdateSourceTrigger=PropertyChanged}" 
+                                                     Background="#333" Foreground="White" Padding="5" Tag="Search Transcripts..."/>
+                                            <DatePicker SelectedDate="{Binding TranscribedDateFilter}" Margin="0,5,0,0" Background="#333"/>
+                                        </StackPanel>
+
+                                        <ListBox Grid.Row="2" ItemsSource="{Binding FilteredTranscribedFiles}" Background="Transparent" BorderThickness="0">
+                                            <ListBox.ItemTemplate>
+                                                <DataTemplate>
+                                                    <Border Background="#252525" Margin="0,0,0,5" Padding="8" CornerRadius="4">
+                                                        <StackPanel>
+                                                            <TextBlock Text="{Binding FileName}" FontWeight="Bold" Foreground="SpringGreen"/>
+                                                            <TextBlock Text="{Binding Transcript}" Foreground="White" MaxHeight="60" TextWrapping="Wrap" FontSize="11" Margin="0,3"/>
+                                                            <TextBlock Text="{Binding CompletedAt, StringFormat=yyyy-MM-dd HH:mm}" Foreground="Gray" FontSize="9" HorizontalAlignment="Right"/>
+                                                        </StackPanel>
+                                                    </Border>
+                                                </DataTemplate>
+                                            </ListBox.ItemTemplate>
+                                        </ListBox>
+                                    </Grid>
+                                </Border>
+
+                                <!-- File Details Panel -->
+                                <Border Width="300" Background="#1A1A1A" BorderBrush="#333" BorderThickness="1,0,0,0" Margin="10,0,0,0"
+                                        Visibility="{Binding IsFileDetailsVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                        <StackPanel Margin="15">
+                                            <TextBlock Text="FILE DETAILS" FontWeight="Bold" Foreground="Gray" Margin="0,0,0,10"/>
+                                            
+                                            <!-- Preview Section -->
+                                            <Border Height="150" Background="#000" CornerRadius="4" Margin="0,0,0,15" ClipToBounds="True">
+                                                <Grid>
+                                                    <!-- Image Preview -->
+                                                    <Image Source="{Binding SelectedFile.FilePath}" Stretch="Uniform" 
+                                                           Visibility="{Binding SelectedFile.FileType, Converter={StaticResource ViewToVisibilityConverter}, ConverterParameter=Image}"/>
+                                                    
+                                                    <!-- Video Preview (Thumbnail/Player) -->
+                                                    <MediaElement Source="{Binding SelectedFile.FilePath}" LoadedBehavior="Pause" ScrubbingEnabled="True" Stretch="Uniform"
+                                                                  Visibility="{Binding SelectedFile.FileType, Converter={StaticResource ViewToVisibilityConverter}, ConverterParameter=Video}"/>
+                                                    
+                                                    <!-- Fallback for others -->
+                                                    <TextBlock Text="No Preview" Foreground="#555" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                </Grid>
+                                            </Border>
+
+                                            <TextBlock Text="Name" Foreground="Gray" FontSize="10"/>
+                                            <TextBox Text="{Binding SelectedFile.FileName, Mode=OneWay}" Background="Transparent" BorderThickness="0" Foreground="White" IsReadOnly="True" TextWrapping="Wrap" FontWeight="Bold" Margin="0,0,0,10"/>
+
+                                            <TextBlock Text="Path" Foreground="Gray" FontSize="10"/>
+                                            <TextBox Text="{Binding SelectedFile.FilePath, Mode=OneWay}" Background="Transparent" BorderThickness="0" Foreground="LightGray" IsReadOnly="True" TextWrapping="Wrap" Margin="0,0,0,10"/>
+
+                                            <Grid Margin="0,0,0,10">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                </Grid.ColumnDefinitions>
+                                                <StackPanel>
+                                                    <TextBlock Text="Created" Foreground="Gray" FontSize="10"/>
+                                                    <TextBlock Text="{Binding SelectedFile.CreationTime, StringFormat=yyyy-MM-dd HH:mm}" Foreground="White"/>
+                                                </StackPanel>
+                                                <StackPanel Grid.Column="1">
+                                                    <TextBlock Text="Modified" Foreground="Gray" FontSize="10"/>
+                                                    <TextBlock Text="{Binding SelectedFile.LastModified, StringFormat=yyyy-MM-dd HH:mm}" Foreground="White"/>
+                                                </StackPanel>
+                                                <StackPanel Grid.Column="1" Margin="10,0,0,0">
+                                                    <TextBlock Text="Accessed" Foreground="Gray" FontSize="10"/>
+                                                    <TextBlock Text="{Binding SelectedFile.LastAccessTime, StringFormat=yyyy-MM-dd HH:mm}" Foreground="White"/>
+                                                </StackPanel>
+                                            </Grid>
+
+                                            <TextBlock Text="User Tags" Foreground="Gray" FontSize="10" Margin="0,5,0,0"/>
+                                            <TextBox Text="{Binding SelectedFileTags, UpdateSourceTrigger=PropertyChanged}" Background="#333" Foreground="White" Padding="5" Margin="0,2,0,10"/>
+                                            <Button Command="{Binding SaveTagsCommand}" Content="Save Tags" Background="#333" Foreground="SpringGreen" Padding="10,5" HorizontalAlignment="Right" Margin="0,0,0,15"/>
+
+                                            <TextBlock Text="Transcript / Caption" Foreground="Gray" FontSize="10"/>
+                                            <TextBox Text="{Binding SelectedFileTranscript, Mode=OneWay}" Background="#222" Foreground="White" BorderThickness="0" 
+                                                     IsReadOnly="True" TextWrapping="Wrap" MinHeight="60" MaxHeight="200" VerticalScrollBarVisibility="Auto" Padding="5"/>
+                                        </StackPanel>
+                                    </ScrollViewer>
+                                </Border>
+                            </StackPanel>
+
                     </Grid>
+                </Grid>
 
                     <!-- LIVE ACTIVITY View -->
-                    <Grid Visibility="{Binding CurrentViewName, Converter={StaticResource ViewToVisibilityConverter}, ConverterParameter=LIVE}">
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="*"/>
-                        </Grid.RowDefinitions>
-                        <TextBlock Text="REAL-TIME EVENTS" FontWeight="SemiBold" Foreground="LightGray" Margin="0,10,0,10"/>
+                        <Grid Margin="0,0,0,10">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            
+                            <!-- Monitoring Controls (Moved here) -->
+                            <Border Background="#222" CornerRadius="4" Padding="10" Margin="0,0,10,0">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="MONITORING:" FontWeight="Bold" Foreground="Gray" VerticalAlignment="Center" Margin="0,0,10,0" FontSize="10"/>
+                                    <Button Command="{Binding StartMonitoringCommand}" Content="Start" Background="Green" Foreground="White" Padding="10,2" Margin="0,0,5,0" FontSize="12" IsEnabled="{Binding IsMonitoring, Converter={StaticResource InverseBooleanConverter}}"/>
+                                    <Button Command="{Binding StopMonitoringCommand}" Content="Stop" Background="Red" Foreground="White" Padding="10,2" Margin="0,0,15,0" FontSize="12" IsEnabled="{Binding IsMonitoring}"/>
+                                    
+                                    <CheckBox IsChecked="{Binding MonitorInternalDatabase}" Content="Monitor Internal DB" Foreground="Gray" FontSize="11" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                                    <CheckBox IsChecked="{Binding ScanReparseFolders}" Content="Scan Reparse Folders" Foreground="Gray" FontSize="11" VerticalAlignment="Center"/>
+                                    
+                                    <Separator Width="1" Background="#444" Margin="15,0"/>
+                                    <TextBlock Text="Status:" Foreground="Gray" VerticalAlignment="Center" Margin="0,0,5,0" FontSize="11"/>
+                                    <TextBlock Text="{Binding IsMonitoring, Converter={StaticResource BooleanToStatusConverter}}" 
+                                             Foreground="{Binding IsMonitoring, Converter={StaticResource BooleanToStatusColorConverter}}" 
+                                             FontWeight="Bold" VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </Border>
+                            
+                            <Button Grid.Column="1" Command="{Binding ToggleIgnoredProcessesPanelCommand}" 
+                                    Content="🚫 Ignored Processes" Background="#333" Foreground="White" Padding="10,5"/>
+                        </Grid>
+
+                        <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,10">
+                             <TextBlock Text="REAL-TIME EVENTS" FontWeight="SemiBold" Foreground="LightGray" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                             <ToggleButton IsChecked="{Binding IsLiveActivityPaused}" Content="⏸️ Pause Updates" Background="#333" Foreground="White" Padding="10,2" Margin="0,0,10,0"/>
+                             
+                             <CheckBox IsChecked="{Binding ShowDllEvents}" Content="Show DLLs" Foreground="Gray" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                             <CheckBox IsChecked="{Binding ShowExeEvents}" Content="Show EXEs" Foreground="Gray" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                             <CheckBox IsChecked="{Binding ShowMuiEvents}" Content="Show MUIs" Foreground="Gray" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                             <CheckBox IsChecked="{Binding ShowPsd1Events}" Content="Show PSD1" Foreground="Gray" VerticalAlignment="Center" Margin="0,0,15,0"/>
+                             <CheckBox IsChecked="{Binding ShowPnfEvents}" Content="Show PNF" Foreground="Gray" VerticalAlignment="Center" Margin="0,0,15,0"/>
+                             <CheckBox IsChecked="{Binding ShowPowerShellEvents}" Content="Show PowerShell" Foreground="Gray" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                             <CheckBox IsChecked="{Binding ShowSystem32Events}" Content="Show System32" Foreground="Gray" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                             <CheckBox IsChecked="{Binding ShowWindowsEvents}" Content="Show Windows" Foreground="Gray" VerticalAlignment="Center" Margin="0,0,15,0"/>
+                             
+                             <TextBlock Text="Limit:" Foreground="Gray" VerticalAlignment="Center" Margin="0,0,5,0"/>
+                             <TextBox Text="{Binding MaxLiveItems}" Width="40" Background="#333" Foreground="White" BorderThickness="1" BorderBrush="#555" Padding="2" VerticalContentAlignment="Center"/>
+                        </StackPanel>
                         
-                        <DataGrid Grid.Row="1" ItemsSource="{Binding RecentActivity}" AutoGenerateColumns="False" 
-                                  Background="Transparent" BorderThickness="0" HeadersVisibility="Column"
-                                  IsReadOnly="True" RowBackground="#222" AlternatingRowBackground="#2A2A2A" Foreground="White">
-                            <DataGrid.Columns>
-                                <DataGridTextColumn Header="Time" Binding="{Binding Timestamp, StringFormat=HH:mm:ss}" Width="80"/>
-                                <DataGridTextColumn Header="Operation" Binding="{Binding Operation}" Width="80"/>
-                                <DataGridTextColumn Header="Process" Binding="{Binding ProcessName}" Width="120"/>
-                                <DataGridTextColumn Header="User" Binding="{Binding UserName}" Width="100"/>
-                                <DataGridTextColumn Header="Path" Binding="{Binding FilePath}" Width="*"/>
-                            </DataGrid.Columns>
-                        </DataGrid>
+                        <Grid Grid.Row="2">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+
+                            <DataGrid ItemsSource="{Binding RecentActivity}" AutoGenerateColumns="False" 
+                                      Background="Transparent" BorderThickness="0" HeadersVisibility="Column"
+                                      IsReadOnly="True" RowBackground="#222" AlternatingRowBackground="#2A2A2A" Foreground="White">
+                                <DataGrid.ContextMenu>
+                                    <ContextMenu>
+                                        <MenuItem Header="🚫 Ignore Process" 
+                                                  Command="{Binding Data.IgnoreProcessCommand, Source={StaticResource Proxy}}"
+                                                  CommandParameter="{Binding ProcessName}"/>
+                                        <Separator/>
+                                        <MenuItem Header="📂 Open in Explorer" 
+                                                  Command="{Binding Data.OpenInExplorerCommand, Source={StaticResource Proxy}}"
+                                                  CommandParameter="{Binding Path=PlacementTarget.SelectedItem, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
+                                    </ContextMenu>
+                                </DataGrid.ContextMenu>
+                                <DataGrid.Columns>
+                                    <DataGridTextColumn Header="Time" Binding="{Binding Timestamp, StringFormat=HH:mm:ss}" Width="80"/>
+                                    <DataGridTextColumn Header="Operation" Binding="{Binding Operation}" Width="100"/>
+                                    <DataGridTextColumn Header="Process" Binding="{Binding ProcessName}" Width="150"/>
+                                    <DataGridTextColumn Header="User" Binding="{Binding UserName}" Width="100"/>
+                                    <DataGridTextColumn Header="Path" Binding="{Binding FilePath}" Width="*"/>
+                                </DataGrid.Columns>
+                            </DataGrid>
+
+                            <!-- Ignored Processes Side Panel -->
+                            <Border Grid.Column="1" Width="250" Background="#1A1A1A" BorderBrush="#333" BorderThickness="1,0,0,0" Margin="10,0,0,0"
+                                    Visibility="{Binding ShowIgnoredProcesses, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                <Grid Margin="10">
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="*"/>
+                                    </Grid.RowDefinitions>
+                                    <TextBlock Text="IGNORED PROCESSES" FontWeight="Bold" Foreground="Gray" Margin="0,0,0,10"/>
+                                    
+                                    <ListBox Grid.Row="1" ItemsSource="{Binding IgnoredProcesses}" Background="Transparent" BorderThickness="0" Foreground="White">
+                                        <ListBox.ItemTemplate>
+                                            <DataTemplate>
+                                                <Grid Margin="0,2">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*"/>
+                                                        <ColumnDefinition Width="Auto"/>
+                                                    </Grid.ColumnDefinitions>
+                                                    <TextBlock Text="{Binding}" VerticalAlignment="Center"/>
+                                                    <Button Grid.Column="1" Content="&#xEF2C;" FontFamily="Segoe MDL2 Assets" 
+                                                            Background="Transparent" Foreground="Red" BorderThickness="0"
+                                                            Command="{Binding DataContext.RemoveIgnoredProcessCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                            CommandParameter="{Binding}"/>
+                                                </Grid>
+                                            </DataTemplate>
+                                        </ListBox.ItemTemplate>
+                                    </ListBox>
+                                </Grid>
+                            </Border>
+                        </Grid>
                     </Grid>
 
                     <!-- DUPLICATES View -->
@@ -270,7 +431,7 @@
                             <DataGrid.Columns>
                                 <DataGridTextColumn Header="Hash" Binding="{Binding CurrentHash}" Width="200"/>
                                 <DataGridTextColumn Header="Path" Binding="{Binding FilePath}" Width="*"/>
-                                <DataGridTextColumn Header="Size" Binding="{Binding FileId}" Width="80"/>
+                                <DataGridTextColumn Header="Size" Binding="{Binding FileSize, Converter={StaticResource FileSizeConverter}}" Width="80"/>
                                 <DataGridTextColumn Header="Last Modified" Binding="{Binding LastModified}" Width="150"/>
                             </DataGrid.Columns>
                         </DataGrid>
@@ -325,147 +486,212 @@
                         </StackPanel>
                     </Grid>
 
-                    <!-- TRANSCRIBE Queue View -->
-                    <Grid Visibility="{Binding CurrentViewName, Converter={StaticResource ViewToVisibilityConverter}, ConverterParameter=TRANSCRIBE}">
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="*"/>
-                            <RowDefinition Height="200"/>
-                        </Grid.RowDefinitions>
-                        
-                        <TextBlock Text="TRANSCRIPTION QUEUE" FontWeight="SemiBold" Foreground="LightGray" Margin="0,10,0,10"/>
-                        
-                        <DataGrid Grid.Row="1" ItemsSource="{Binding TranscribeQueue}" AutoGenerateColumns="False" 
-                                  Background="Transparent" BorderThickness="0" HeadersVisibility="Column"
-                                  IsReadOnly="True" RowBackground="#222" AlternatingRowBackground="#2A2A2A" Foreground="White"
-                                  SelectedItem="{Binding SelectedTranscriptionTask}">
-                            <DataGrid.Columns>
-                                <DataGridTextColumn Header="File" Binding="{Binding FileName}" Width="200"/>
-                                <DataGridTextColumn Header="Status" Binding="{Binding Status}" Width="100"/>
-                                <DataGridTextColumn Header="Queued" Binding="{Binding QueuedAt, StringFormat=HH:mm:ss}" Width="100"/>
-                                <DataGridTextColumn Header="Path" Binding="{Binding FilePath}" Width="*"/>
-                            </DataGrid.Columns>
-                        </DataGrid>
-                        
-                        <Grid Grid.Row="2" Background="#222" Margin="0,10,0,0">
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="*"/>
-                            </Grid.RowDefinitions>
-                            <TextBlock Text="GENERATED TRANSCRIPT / CAPTION" Foreground="Gray" FontWeight="Bold" Margin="10,5"/>
-                            <TextBox Grid.Row="1" Text="{Binding SelectedTranscriptionTask.Transcript, Mode=OneWay}" 
-                                     Background="Transparent" Foreground="White" BorderThickness="0" 
-                                     TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" IsReadOnly="True" Padding="10"/>
-                        </Grid>
+                
 
-                        <!-- Ignore List View -->
-                        <Grid Visibility="{Binding CurrentViewName, Converter={StaticResource ViewToVisibilityConverter}, ConverterParameter=IGNORE_LIST}">
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="*"/>
-                            </Grid.RowDefinitions>
 
-                            <Border Grid.Row="0" Background="#222" CornerRadius="4" Padding="15" Margin="0,0,0,10">
-                                <Grid>
+    <!-- TRANSCRIBE Queue View -->
+    <Grid Visibility="{Binding CurrentViewName, Converter={StaticResource ViewToVisibilityConverter}, ConverterParameter=TRANSCRIBE}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/> <!-- Header -->
+            <RowDefinition Height="Auto"/> <!-- Controls -->
+            <RowDefinition Height="*"/>    <!-- Queue -->
+            <RowDefinition Height="200"/>  <!-- Caption -->
+        </Grid.RowDefinitions>
+        
+        <TextBlock  Grid.Row="0" Text="TRANSCRIPTION" FontWeight="SemiBold" Foreground="LightGray" Margin="0,10,0,10"/>
+
+        <!-- Transcription Controls Area -->
+        <Border Grid.Row="1" Margin="0,0,0,10" Background="#222" Padding="10">
+            <StackPanel>
+                <StackPanel Orientation="Horizontal" Margin="10,0,10,10">
+                     <Button Command="{Binding DownloadModelsCommand}" Content="⬇ Download AI Models" Background="#2E7D32" Foreground="White" Padding="15,5" Margin="0,0,20,0"/>
+    
+                     <TextBlock Text="Model:" Foreground="Gray" VerticalAlignment="Center" Margin="0,0,5,0"/>
+                     <ComboBox ItemsSource="{Binding WhisperModels}" SelectedItem="{Binding SelectedWhisperModel}" 
+                               Width="120" Margin="0,0,20,0" VerticalContentAlignment="Center">
+                         <ComboBox.Resources>
+                             <Style TargetType="ComboBoxItem">
+                                 <Setter Property="Background" Value="#333"/>
+                                 <Setter Property="Foreground" Value="White"/>
+                             </Style>
+                         </ComboBox.Resources>
+                     </ComboBox>
+                                
+                     <CheckBox IsChecked="{Binding IsEnglishOnly}" Content="English Only" Foreground="Gray" VerticalAlignment="Center" Margin="0,0,20,0"/>
+
+                     <Separator Width="1" Background="#444" Margin="10,5"/>
+                     
+                     <!-- GPU Control -->
+                     <ToggleButton IsChecked="{Binding UseGpu}" Padding="10,5" Margin="0,0,10,0" Background="#333" BorderThickness="1">
+                         <ToggleButton.Style>
+                             <Style TargetType="ToggleButton">
+                                 <Setter Property="Content" Value="🚀 GPU: OFF"/>
+                                 <Setter Property="Foreground" Value="Gray"/>
+                                 <Style.Triggers>
+                                     <Trigger Property="IsChecked" Value="True">
+                                         <Setter Property="Content" Value="🚀 GPU: ON"/>
+                                         <Setter Property="Foreground" Value="SpringGreen"/>
+                                     </Trigger>
+                                 </Style.Triggers>
+                             </Style>
+                         </ToggleButton.Style>
+                     </ToggleButton>
+
+                     <TextBlock VerticalAlignment="Center" Margin="0,0,20,0">
+                         <TextBlock.Style>
+                             <Style TargetType="TextBlock">
+                                 <Setter Property="Text" Value="⚠️ CUDA NOT DETECTED"/>
+                                 <Setter Property="Foreground" Value="Red"/>
+                                 <Setter Property="FontSize" Value="10"/>
+                                 <Style.Triggers>
+                                     <DataTrigger Binding="{Binding IsCudaAvailable}" Value="True">
+                                         <Setter Property="Text" Value="✅ CUDA READY"/>
+                                         <Setter Property="Foreground" Value="SpringGreen"/>
+                                     </DataTrigger>
+                                 </Style.Triggers>
+                             </Style>
+                         </TextBlock.Style>
+                     </TextBlock>
+                     
+                     <Button Command="{Binding ReTranscribeSelectedTaskCommand}" Content="🔄 Re-Transcribe Selected" 
+                             Background="#FF6600" Foreground="White" Padding="15,5" Margin="0,0,0,0"
+                             ToolTip="Re-transcribe the selected file with the currently selected model"/>
+                </StackPanel>
+            </StackPanel>
+        </Border>
+        
+        <DataGrid Grid.Row="2" ItemsSource="{Binding TranscribeQueue}" AutoGenerateColumns="False" 
+                  Background="Transparent" BorderThickness="0" HeadersVisibility="Column"
+                  IsReadOnly="True" RowBackground="#222" AlternatingRowBackground="#2A2A2A" Foreground="White"
+                  SelectedItem="{Binding SelectedTranscriptionTask}">
+            <DataGrid.Columns>
+                <DataGridTextColumn Header="File" Binding="{Binding FileName}" Width="200"/>
+                <DataGridTextColumn Header="Status" Binding="{Binding Status}" Width="100"/>
+                <DataGridTextColumn Header="Model" Binding="{Binding ModelUsed}" Width="180"/>
+                <DataGridTextColumn Header="Queued" Binding="{Binding QueuedAt, StringFormat=HH:mm:ss}" Width="100"/>
+            </DataGrid.Columns>
+        </DataGrid>
+        
+        <Grid Grid.Row="3" Background="#222" Margin="0,10,0,0">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+            <TextBlock Text="GENERATED TRANSCRIPT / CAPTION" Foreground="Gray" FontWeight="Bold" Margin="10,5"/>
+            <TextBox Grid.Row="1" Text="{Binding SelectedTranscriptionTask.Transcript, Mode=OneWay}" 
+                     Background="Transparent" Foreground="White" BorderThickness="0" 
+                     TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" IsReadOnly="True" Padding="10"/>
+        </Grid>
+    </Grid>
+
+    <!-- Ignore List View -->
+    <Grid Visibility="{Binding CurrentViewName, Converter={StaticResource ViewToVisibilityConverter}, ConverterParameter=IGNORE_LIST}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <Border Grid.Row="0" Background="#222" CornerRadius="4" Padding="15" Margin="0,0,0,10">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <StackPanel>
+                    <TextBlock Text="MANAGED IGNORE LIST" FontSize="20" FontWeight="Bold" Foreground="White" Margin="0,0,0,5"/>
+                    <TextBlock Text="Grouped by lowest common parent directory. Click on a path to expand the ignore scope to its parents." Foreground="LightGray" TextWrapping="Wrap"/>
+                </StackPanel>
+                <Button Grid.Column="1" Command="{Binding RefreshIgnoreListCommand}" 
+                        Content="🔄 REFRESH LIST" 
+                        Background="RoyalBlue" Foreground="White" FontWeight="Bold"
+                        Padding="20,10" VerticalAlignment="Center" BorderThickness="0"/>
+            </Grid>
+        </Border>
+
+        <ScrollViewer Grid.Row="1">
+            <ItemsControl ItemsSource="{Binding IgnoredGroups}">
+                <!-- Placeholder if list is empty -->
+                <ItemsControl.Style>
+                    <Style TargetType="ItemsControl">
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding IgnoredGroups.Count}" Value="0">
+                                <Setter Property="Template">
+                                    <Setter.Value>
+                                        <ControlTemplate>
+                                            <TextBlock Text="No files or folders are currently ignored." 
+                                                     Foreground="Gray" HorizontalAlignment="Center" Margin="0,50,0,0" FontSize="16"/>
+                                        </ControlTemplate>
+                                    </Setter.Value>
+                                </Setter>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </ItemsControl.Style>
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <Border Background="#222" Margin="0,0,0,10" CornerRadius="4" Padding="10">
+                            <StackPanel>
+                                <Grid Margin="0,0,0,5">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="*"/>
                                         <ColumnDefinition Width="Auto"/>
                                     </Grid.ColumnDefinitions>
-                                    <StackPanel>
-                                        <TextBlock Text="MANAGED IGNORE LIST" FontSize="20" FontWeight="Bold" Foreground="White" Margin="0,0,0,5"/>
-                                        <TextBlock Text="Grouped by lowest common parent directory. Click on a path to expand the ignore scope to its parents." Foreground="LightGray" TextWrapping="Wrap"/>
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Text="📂 Group:" Foreground="Gray" Margin="0,0,5,0" VerticalAlignment="Center"/>
+                                        <ItemsControl ItemsSource="{Binding ParentHierarchy}" VerticalAlignment="Center">
+                                            <ItemsControl.ItemsPanel>
+                                                <ItemsPanelTemplate>
+                                                    <StackPanel Orientation="Horizontal"/>
+                                                </ItemsPanelTemplate>
+                                            </ItemsControl.ItemsPanel>
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <StackPanel Orientation="Horizontal">
+                                                        <Button Content="{Binding}" Background="Transparent" BorderThickness="0" Foreground="SpringGreen" Padding="2,0"
+                                                              Command="{Binding DataContext.ReplaceWithParentIgnoreCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                              CommandParameter="{Binding}" Cursor="Hand">
+                                                            <Button.ToolTip>
+                                                                <ToolTip Content="Ignore this entire directory instead"/>
+                                                            </Button.ToolTip>
+                                                        </Button>
+                                                        <TextBlock Text=" > " Foreground="Gray" VerticalAlignment="Center"/>
+                                                    </StackPanel>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
                                     </StackPanel>
-                                    <Button Grid.Column="1" Command="{Binding RefreshIgnoreListCommand}" 
-                                            Content="🔄 REFRESH LIST" 
-                                            Background="RoyalBlue" Foreground="White" FontWeight="Bold"
-                                            Padding="20,10" VerticalAlignment="Center" BorderThickness="0"/>
-                                </Grid>
-                            </Border>
-
-                            <ScrollViewer Grid.Row="1">
-                                <ItemsControl ItemsSource="{Binding IgnoredGroups}">
-                                    <!-- Placeholder if list is empty -->
-                                    <ItemsControl.Style>
-                                        <Style TargetType="ItemsControl">
-                                            <Style.Triggers>
-                                                <DataTrigger Binding="{Binding IgnoredGroups.Count}" Value="0">
-                                                    <Setter Property="Template">
-                                                        <Setter.Value>
-                                                            <ControlTemplate>
-                                                                <TextBlock Text="No files or folders are currently ignored." 
-                                                                           Foreground="Gray" HorizontalAlignment="Center" Margin="0,50,0,0" FontSize="16"/>
-                                                            </ControlTemplate>
-                                                        </Setter.Value>
-                                                    </Setter>
-                                                </DataTrigger>
-                                            </Style.Triggers>
-                                        </Style>
-                                    </ItemsControl.Style>
+                                <Button Grid.Column="1" Content="Remove Group" Background="#444" Foreground="White" Padding="10,2"
+                                          Command="{Binding DataContext.UnignoreGroupCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                          CommandParameter="{Binding}"/>
+                            </Grid>
+                                
+                                <ItemsControl ItemsSource="{Binding Rules}" Margin="20,5,0,0">
                                     <ItemsControl.ItemTemplate>
                                         <DataTemplate>
-                                            <Border Background="#222" Margin="0,0,0,10" CornerRadius="4" Padding="10">
-                                                <StackPanel>
-                                                    <Grid Margin="0,0,0,5">
-                                                        <Grid.ColumnDefinitions>
-                                                            <ColumnDefinition Width="*"/>
-                                                            <ColumnDefinition Width="Auto"/>
-                                                        </Grid.ColumnDefinitions>
-                                                        <StackPanel Orientation="Horizontal">
-                                                            <TextBlock Text="📂 Group:" Foreground="Gray" Margin="0,0,5,0" VerticalAlignment="Center"/>
-                                                            <ItemsControl ItemsSource="{Binding ParentHierarchy}" VerticalAlignment="Center">
-                                                                <ItemsControl.ItemsPanel>
-                                                                    <ItemsPanelTemplate>
-                                                                        <StackPanel Orientation="Horizontal"/>
-                                                                    </ItemsPanelTemplate>
-                                                                </ItemsControl.ItemsPanel>
-                                                                <ItemsControl.ItemTemplate>
-                                                                    <DataTemplate>
-                                                                        <StackPanel Orientation="Horizontal">
-                                                                            <Button Content="{Binding}" Background="Transparent" BorderThickness="0" Foreground="SpringGreen" Padding="2,0"
-                                                                                    Command="{Binding DataContext.ReplaceWithParentIgnoreCommand, RelativeSource={RelativeSource AncestorType=Window}}"
-                                                                                    CommandParameter="{Binding}" Cursor="Hand">
-                                                                                <Button.ToolTip>
-                                                                                    <ToolTip Content="Ignore this entire directory instead"/>
-                                                                                </Button.ToolTip>
-                                                                            </Button>
-                                                                            <TextBlock Text=" > " Foreground="Gray" VerticalAlignment="Center"/>
-                                                                        </StackPanel>
-                                                                    </DataTemplate>
-                                                                </ItemsControl.ItemTemplate>
-                                                            </ItemsControl>
-                                                        </StackPanel>
-                                                        <Button Grid.Column="1" Content="Remove Group" Background="#444" Foreground="White" Padding="10,2"
-                                                                Command="{Binding DataContext.UnignoreGroupCommand, RelativeSource={RelativeSource AncestorType=Window}}"
-                                                                CommandParameter="{Binding}"/>
-                                                    </Grid>
-                                                    
-                                                    <ItemsControl ItemsSource="{Binding Rules}" Margin="20,5,0,0">
-                                                        <ItemsControl.ItemTemplate>
-                                                            <DataTemplate>
-                                                                <Grid Margin="0,2">
-                                                                    <Grid.ColumnDefinitions>
-                                                                        <ColumnDefinition Width="*"/>
-                                                                        <ColumnDefinition Width="Auto"/>
-                                                                    </Grid.ColumnDefinitions>
-                                                                    <TextBlock Text="{Binding Path}" Foreground="LightGray" VerticalAlignment="Center"/>
-                                                                    <Button Grid.Column="1" Content="&#xEF2C;" FontFamily="Segoe MDL2 Assets" Background="Transparent" Foreground="Red" 
-                                                                            BorderThickness="0" Padding="5,0" Command="{Binding DataContext.UnignoreRuleCommand, RelativeSource={RelativeSource AncestorType=Window}}"
-                                                                            CommandParameter="{Binding}"/>
-                                                                </Grid>
-                                                            </DataTemplate>
-                                                        </ItemsControl.ItemTemplate>
-                                                    </ItemsControl>
-                                                </StackPanel>
-                                            </Border>
+                                            <Grid Margin="0,2">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock Text="{Binding Path}" Foreground="LightGray" VerticalAlignment="Center"/>
+                                                <Button Grid.Column="1" Content="&#xEF2C;" FontFamily="Segoe MDL2 Assets" Background="Transparent" Foreground="Red" 
+                                                      BorderThickness="0" Padding="5,0" Command="{Binding DataContext.UnignoreRuleCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                      CommandParameter="{Binding}"/>
+                                            </Grid>
                                         </DataTemplate>
                                     </ItemsControl.ItemTemplate>
                                 </ItemsControl>
-                            </ScrollViewer>
-                        </Grid>
-                    </Grid>
+                            </StackPanel>
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </ScrollViewer>
+    </Grid>
                 </Grid>
             </Border>
         </Grid>
+
 
         <!-- Footer - Shows Scan Status and Statistics -->
         <StatusBar Grid.Row="1" Background="#111111" Foreground="Gray" Padding="5,2">
@@ -484,19 +710,26 @@
                     <TextBlock Text="{Binding TotalCodeFiles}" Foreground="SpringGreen" Margin="0,0,15,0"/>
                     
                     <Separator Width="1" Background="#333" Margin="10,0"/>
-                    
-                    <TextBlock Text="Status: " FontWeight="Bold"/>
-                    <TextBlock Text="{Binding StatusMessage}" Foreground="SpringGreen" Margin="0,0,20,0"/>
 
-                    <Separator Width="1" Background="#333" Margin="10,0"/>
-                    
                     <TextBlock Text="Selected: " FontWeight="Bold" Foreground="White"/>
                     <TextBlock Text="{Binding SelectedItemsCount}" Foreground="SpringGreen" Margin="5,0,0,0"/>
                     <TextBlock Text=" files (" Foreground="Gray"/>
                     <TextBlock Text="{Binding SelectedItemsSize, Converter={StaticResource FileSizeConverter}}" Foreground="SpringGreen"/>
                     <TextBlock Text=")" Foreground="Gray"/>
+                    
+                    <TextBlock Text="{Binding ScanETA}" Foreground="Yellow" FontWeight="Bold" Margin="20,0,0,0" VerticalAlignment="Center"/>
+                    
+                    <!-- Hash Progress -->
+                    <TextBlock Text="{Binding HashProgress}" Foreground="Cyan" Margin="10,0,0,0" VerticalAlignment="Center"/>
+                    <TextBlock Text="{Binding HashETA}" Foreground="Cyan" FontWeight="Bold" Margin="10,0,0,0" VerticalAlignment="Center"/>
+
+                    <Separator Width="1" Background="#333" Margin="10,0"/>
+                    
+                    <TextBlock Text="Status: " FontWeight="Bold"/>
+                    <TextBlock Text="{Binding StatusMessage}" Foreground="SpringGreen" Margin="0,0,20,0"/>
                 </StackPanel>
             </StatusBarItem>
+
             <StatusBarItem HorizontalAlignment="Right">
                 <StackPanel Orientation="Horizontal">
                     <TextBlock Text="Last Scanned: " Foreground="Gray"/>

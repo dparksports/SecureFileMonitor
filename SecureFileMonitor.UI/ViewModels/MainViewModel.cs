@@ -74,6 +74,16 @@ namespace SecureFileMonitor.UI.ViewModels
         [ObservableProperty]
         private string _lastScannedTime = "Never";
 
+        [ObservableProperty]
+        private string _scanETA = "";
+
+        // Background Hashing Progress
+        [ObservableProperty]
+        private string _hashProgress = "";
+
+        [ObservableProperty]
+        private string _hashETA = "";
+
         // Sorting
         [ObservableProperty]
         private string _sortBy = "LastModified"; // Default to LastModified to show actual work first
@@ -95,6 +105,79 @@ namespace SecureFileMonitor.UI.ViewModels
         [ObservableProperty]
         private long _selectedItemsSize;
 
+        [ObservableProperty]
+        private bool _isTranscribeViewVisible;
+
+        [ObservableProperty]
+        private bool _isFileDetailsVisible;
+
+        [ObservableProperty]
+        private bool _isLiveActivityPaused;
+
+        [RelayCommand]
+        private void ToggleLiveActivityPause()
+        {
+            IsLiveActivityPaused = !IsLiveActivityPaused;
+        }
+
+        [ObservableProperty]
+        private int _maxLiveItems = 50;
+
+        [ObservableProperty]
+        private bool _showDllEvents = false; // Default Off
+
+        [ObservableProperty]
+        private bool _showExeEvents = true; // Default On (Usually interesting)
+
+        [ObservableProperty]
+        private bool _showMuiEvents = false; // Default Off
+
+        [ObservableProperty]
+        private bool _showPsd1Events = false; // Default Off
+
+        [ObservableProperty]
+        private bool _showPowerShellEvents = false; // Default: Off (Filters \Windows\System32\WindowsPowerShell\)
+
+        [ObservableProperty]
+        private bool _showSystem32Events = false; // Default: Off (Filters \Windows\System32\)
+
+        [ObservableProperty]
+        private bool _showPnfEvents = false; // Default: Off (Filters .pnf)
+
+        [ObservableProperty]
+        private bool _showWindowsEvents = false; // Default: Off (Filters \Windows\)
+
+        [ObservableProperty]
+        private string _transcribedFileSearchQuery = string.Empty;
+
+        [ObservableProperty]
+        private string _selectedWhisperModel = "Base"; // Base, Medium, Large, Turbo
+
+        public System.Collections.Generic.List<string> WhisperModels { get; } = new() { "Base", "Medium", "Large", "Turbo" };
+
+        [ObservableProperty]
+        private bool _isEnglishOnly = true;
+
+        [ObservableProperty]
+        private bool _useGpu = true;
+
+        [ObservableProperty]
+        private bool _isCudaAvailable;
+
+        [ObservableProperty]
+        private TranscriptionTask? _selectedTranscriptionTask;
+        
+        // Ignored Processes
+        public ObservableCollection<string> IgnoredProcesses { get; } = new();
+
+        [ObservableProperty]
+        private bool _showIgnoredProcesses;
+
+        [ObservableProperty]
+        private DateTime? _transcribedDateFilter;
+
+        public ObservableCollection<TranscriptionTask> FilteredTranscribedFiles { get; } = new();
+
         public string[] SortByOptions { get; } = { "Name", "CreationTime", "LastModified", "Size" };
 
         partial void OnSortByChanged(string value) => ApplyFilters();
@@ -102,6 +185,9 @@ namespace SecureFileMonitor.UI.ViewModels
         partial void OnDateFilterStartChanged(DateTime? value) => ApplyFilters();
         partial void OnDateFilterEndChanged(DateTime? value) => ApplyFilters();
         partial void OnEnableIgnoreListChanged(bool value) => ApplyFilters();
+        partial void OnTranscribedFileSearchQueryChanged(string value) => ApplyTranscriptionFilters();
+        partial void OnTranscribedDateFilterChanged(DateTime? value) => ApplyTranscriptionFilters();
+        partial void OnIsTranscribeViewVisibleChanged(bool value) => ApplyTranscriptionFilters();
 
         [RelayCommand]
         public void SwitchView(string viewName)
@@ -233,6 +319,8 @@ namespace SecureFileMonitor.UI.ViewModels
         }
 
         private readonly IFileScannerService _scannerService;
+        private readonly System.Collections.Concurrent.ConcurrentQueue<FileActivityEvent> _eventQueue = new();
+        private readonly System.Timers.Timer _eventProcessingTimer; // Changed from DispatcherTimer
         
         [ObservableProperty]
         private FileEntry? _selectedFile;
@@ -240,24 +328,27 @@ namespace SecureFileMonitor.UI.ViewModels
         [ObservableProperty]
         private string _selectedFileTags = string.Empty;
 
+        [ObservableProperty]
+        private string _selectedFileTranscript = "No transcript available.";
+
         partial void OnSelectedFileChanged(FileEntry? value)
         {
             if (value != null)
             {
-                // Ideally load metadata from DB
-                // For now, clear tags or load if we had them in FileEntry
-                // We added Tags to FileMetadata, not FileEntry. Need DB lookup.
-                // Async void is tricky here, better to use a Command or specialized loader.
-                // Stub:
-                SelectedFileTags = "Loading...";
-                Task.Run(async () => 
+                // Tags
+                _dbService.GetFileTagsAsync(value.FilePath).ContinueWith(t => 
                 {
-                    var meta = await _dbService.GetMetadataAsync(value.FileId.ToString()); // Verify ID mapping
-                    App.Current.Dispatcher.Invoke(() => 
-                    {
-                        SelectedFileTags = meta?.Tags ?? ""; 
-                    });
-                });
+                    SelectedFileTags = string.Join(", ", t.Result);
+                }, TaskScheduler.FromCurrentSynchronizationContext());
+
+                // Transcript
+                var task = TranscribeQueue.FirstOrDefault(t => t.FilePath == value.FilePath && t.Status == TranscriptionStatus.Completed);
+                SelectedFileTranscript = task?.Transcript ?? "No transcript available.";
+            }
+            else
+            {
+                SelectedFileTags = string.Empty;
+                SelectedFileTranscript = string.Empty;
             }
         }
 
@@ -272,9 +363,25 @@ namespace SecureFileMonitor.UI.ViewModels
             StatusMessage = "Tags saved.";
         }
 
+        private CancellationTokenSource? _scanCts;
+
+        [RelayCommand]
+        public void StopScan()
+        {
+            if (_scanCts != null && !_scanCts.IsCancellationRequested)
+            {
+                _scanCts.Cancel();
+                StatusMessage = "Stopping scan...";
+            }
+        }
+
         [RelayCommand]
         public async Task ScanDrive()
         {
+            // Reset CTS
+            if (_scanCts != null) {  try { _scanCts.Cancel(); _scanCts.Dispose(); } catch {} }
+            _scanCts = new CancellationTokenSource();
+
             try
             {
                 StatusMessage = "Initializing database...";
@@ -283,22 +390,66 @@ namespace SecureFileMonitor.UI.ViewModels
                 StatusMessage = "Scanning all available drives for existing files...";
                 var drives = DriveInfo.GetDrives().Where(d => d.IsReady && (d.DriveType == DriveType.Fixed || d.DriveType == DriveType.Removable || d.DriveType == DriveType.Network));
                 
+                var progress = new Progress<(string Status, double? Percent, TimeSpan? ETA)>(val => 
+                {
+                     StatusMessage = val.Status;
+                     if (val.ETA.HasValue)
+                     {
+                        ScanETA = $"ETA: {val.ETA.Value.Hours:D2}:{val.ETA.Value.Minutes:D2}:{val.ETA.Value.Seconds:D2}";
+                     }
+                     else 
+                     {
+                        ScanETA = "Calculating ETA...";
+                     }
+                });
+
                 foreach (var drive in drives)
                 {
+                    if (_scanCts.Token.IsCancellationRequested) break;
+
                     StatusMessage = $"Scanning {drive.Name}...";
-                    await _scannerService.ScanDriveAsync(drive.Name, ScanReparseFolders, new Progress<string>(s => StatusMessage = s), CancellationToken.None);
+                    await _scannerService.ScanDriveAsync(drive.Name, ScanReparseFolders, progress, _scanCts.Token);
                 }
 
 
-                StatusMessage = "Scan Complete.";
+                StatusMessage = _scanCts.Token.IsCancellationRequested ? "Scan Stopped." : "Scan Complete. Starting background hash...";
+                ScanETA = ""; // Clear ETA
                 await LoadAllFiles(); // Auto-refresh
+                
+                // Start background hashing for large files
+                int pendingHashes = _scannerService.GetPendingHashCount();
+                if (pendingHashes > 0 && !_scanCts.Token.IsCancellationRequested)
+                {
+                    HashProgress = $"Hashing {pendingHashes} large files...";
+                    var hashProgress = new Progress<(string Status, int Remaining, int Total, TimeSpan? ETA)>(val =>
+                    {
+                        HashProgress = $"Hashing: {val.Status} ({val.Remaining}/{val.Total})";
+                        if (val.ETA.HasValue)
+                        {
+                            HashETA = $"ETA: {val.ETA.Value.Hours:D2}:{val.ETA.Value.Minutes:D2}:{val.ETA.Value.Seconds:D2}";
+                        }
+                        else
+                        {
+                            HashETA = "Calculating ETA...";
+                        }
+                    });
+                    await _scannerService.StartBackgroundHashingAsync(hashProgress, _scanCts.Token);
+                    HashProgress = "";
+                    HashETA = "";
+                    StatusMessage = "Scan and Hash Complete.";
+                }
 
             }
 
+            catch (OperationCanceledException)
+            {
+                StatusMessage = "Scan Stopped.";
+                ScanETA = "";
+            }
             catch (Exception ex)
             {
                 StatusMessage = $"Scan Error: {ex.Message}";
-
+                ScanETA = "";
             }
 
         }
@@ -455,8 +606,107 @@ namespace SecureFileMonitor.UI.ViewModels
             if (selectedItems == null) return;
             var files = selectedItems.Cast<FileEntry>().ToList();
             
+            foreach (var file in files)
+            {
+                // Check if already in queue or transcribed
+                if (TranscribeQueue.Any(t => t.FilePath == file.FilePath)) continue;
+
+                var task = new TranscriptionTask
+                {
+                    FilePath = file.FilePath,
+                    FileName = file.FileName,
+                    Status = TranscriptionStatus.Queued,
+                    QueuedAt = DateTime.Now
+                };
+                TranscribeQueue.Add(task);
+                await _dbService.SaveTranscriptionTaskAsync(task); // Persist new task
+            }
+
             _ = ProcessTranscriptionQueueAsync();
             CurrentViewName = "TRANSCRIBE";
+        }
+
+        [RelayCommand]
+        private async Task ReTranscribeSelectedTask()
+        {
+            if (SelectedTranscriptionTask == null) return;
+            
+            // Reset the task for re-processing with new model settings
+            string modelLabel = $"Whisper {SelectedWhisperModel}" + (IsEnglishOnly ? " (English)" : " (Multilingual)");
+            
+            // Store previous transcript for comparison
+            string previousTranscript = SelectedTranscriptionTask.Transcript;
+            string previousModel = SelectedTranscriptionTask.ModelUsed;
+            
+            SelectedTranscriptionTask.Status = TranscriptionStatus.Queued;
+            SelectedTranscriptionTask.ModelUsed = modelLabel;
+            SelectedTranscriptionTask.Transcript = $"[Previous: {previousModel}]\n{previousTranscript}\n\n[Re-transcribing with {modelLabel}...]";
+            
+            await _dbService.SaveTranscriptionTaskAsync(SelectedTranscriptionTask); // Update task status
+            _ = ProcessTranscriptionQueueAsync();
+        }
+
+        [RelayCommand]
+        private async Task IgnoreProcess(string? processName)
+        {
+            if (string.IsNullOrEmpty(processName)) return;
+            if (!IgnoredProcesses.Contains(processName))
+            {
+                IgnoredProcesses.Add(processName);
+                await _dbService.AddIgnoredProcessAsync(processName);
+                
+                // Remove existing events for this process from the current view
+                var toRemove = RecentActivity.Where(a => a.ProcessName == processName).ToList();
+                foreach (var item in toRemove) RecentActivity.Remove(item);
+                
+                // Clear from active events dictionary too
+                var keysToRemove = _activeFileEvents.Where(kv => kv.Value.ProcessName == processName).Select(kv => kv.Key).ToList();
+                foreach (var key in keysToRemove) _activeFileEvents.Remove(key);
+                
+                StatusMessage = $"Ignoring process: {processName}";
+            }
+        }
+
+        [RelayCommand]
+        private async Task RemoveIgnoredProcess(string? processName)
+        {
+            if (string.IsNullOrEmpty(processName)) return;
+            if (IgnoredProcesses.Contains(processName))
+            {
+                IgnoredProcesses.Remove(processName);
+                await _dbService.RemoveIgnoredProcessAsync(processName);
+                StatusMessage = $"Restored process: {processName}";
+            }
+        }
+
+        [RelayCommand]
+        private void ToggleIgnoredProcessesPanel()
+        {
+            ShowIgnoredProcesses = !ShowIgnoredProcesses;
+        }
+
+        private void ApplyTranscriptionFilters()
+        {
+            var query = TranscribeQueue.AsEnumerable();
+
+            if (!string.IsNullOrWhiteSpace(TranscribedFileSearchQuery))
+            {
+                query = query.Where(t => 
+                    (t.FileName?.Contains(TranscribedFileSearchQuery, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                    (t.Transcript?.Contains(TranscribedFileSearchQuery, StringComparison.OrdinalIgnoreCase) ?? false));
+            }
+
+            if (TranscribedDateFilter.HasValue)
+            {
+                query = query.Where(t => t.QueuedAt.Date == TranscribedDateFilter.Value.Date || 
+                                       (t.CompletedAt.HasValue && t.CompletedAt.Value.Date == TranscribedDateFilter.Value.Date));
+            }
+
+            FilteredTranscribedFiles.Clear();
+            foreach (var item in query.OrderByDescending(t => t.QueuedAt))
+            {
+                FilteredTranscribedFiles.Add(item);
+            }
         }
 
         [RelayCommand]
@@ -576,9 +826,14 @@ namespace SecureFileMonitor.UI.ViewModels
                     if (task == null) break;
 
                     task.Status = TranscriptionStatus.Processing;
+                    await _dbService.SaveTranscriptionTaskAsync(task); // Update status in DB
                     try
                     {
-                        task.Transcript = await _aiService.TranscribeAudioAsync(task.FilePath);
+                        // Capture current model settings
+                        string modelLabel = $"Whisper {SelectedWhisperModel}" + (IsEnglishOnly ? " (English)" : " (Multilingual)");
+                        task.ModelUsed = modelLabel;
+                        
+                        task.Transcript = await _aiService.TranscribeAudioAsync(task.FilePath, SelectedWhisperModel, IsEnglishOnly, UseGpu);
                         task.Status = TranscriptionStatus.Completed;
                         task.CompletedAt = DateTime.Now;
                         
@@ -595,6 +850,7 @@ namespace SecureFileMonitor.UI.ViewModels
                         task.Status = TranscriptionStatus.Error;
                         task.ErrorMessage = ex.Message;
                     }
+                    await _dbService.SaveTranscriptionTaskAsync(task); // Save final status and transcript
                 }
 
 
@@ -616,26 +872,156 @@ namespace SecureFileMonitor.UI.ViewModels
             _aiService = aiService;
             _scannerService = scannerService;
 
+            IsCudaAvailable = _aiService.IsCudaAvailable;
+
             // Wire up events
             _etwService.OnFileActivity += EtwService_OnFileActivity;
 
-            // Load initial state
-            _ = LoadAllFiles();
+            // Load initial data
+            _ = InitializeAsync();
+
+            _eventProcessingTimer = new System.Timers.Timer(500);
+            _eventProcessingTimer.Elapsed += (s, e) => ProcessEventQueue();
+            _eventProcessingTimer.Start();
         }
 
+        private async Task InitializeAsync()
+        {
+            await LoadAllFiles();
+            await RefreshIgnoreList();
+            await LoadTranscriptionHistory();
+            await LoadIgnoredProcesses();
+        }
+
+        private async Task LoadTranscriptionHistory()
+        {
+            var tasks = await _dbService.GetAllTranscriptionTasksAsync();
+            foreach (var task in tasks)
+            {
+                if (!TranscribeQueue.Any(t => t.Id == task.Id))
+                {
+                    TranscribeQueue.Add(task);
+                }
+            }
+        }
+
+        private async Task LoadIgnoredProcesses()
+        {
+            var processes = await _dbService.GetIgnoredProcessesAsync();
+            IgnoredProcesses.Clear();
+            foreach (var p in processes)
+            {
+                IgnoredProcesses.Add(p);
+            }
+        }
+        
+        private readonly System.Collections.Generic.Dictionary<string, FileActivityEvent> _activeFileEvents = new();
+        
         private void EtwService_OnFileActivity(object? sender, FileActivityEvent e)
         {
-            // Marshal to UI thread if needed (WPF usually needs Dispatcher, but ObservableCollection might need it)
-            // For now, assume ViewModel needs to handle dispatching or use BindingOperations.EnableCollectionSynchronization
-            
-            App.Current.Dispatcher.Invoke(() =>
-            {
-                RecentActivity.Insert(0, e);
-                if (RecentActivity.Count > 100) RecentActivity.RemoveAt(100);
-            });
-            
-            // Log to DB
+            if (IsLiveActivityPaused) return;
+
+            // Log to DB (Fire and forget)
             Task.Run(async () => await _dbService.SaveAuditLogAsync(e));
+
+            // Filtering (Do this early to avoid queue spam)
+            if (!ShowDllEvents && e.FilePath.EndsWith(".dll", StringComparison.OrdinalIgnoreCase)) return;
+            if (!ShowExeEvents && e.FilePath.EndsWith(".exe", StringComparison.OrdinalIgnoreCase)) return;
+            if (!ShowMuiEvents && e.FilePath.EndsWith(".mui", StringComparison.OrdinalIgnoreCase)) return;
+            if (!ShowPsd1Events && e.FilePath.EndsWith(".psd1", StringComparison.OrdinalIgnoreCase)) return;
+            if (!ShowPnfEvents && e.FilePath.EndsWith(".pnf", StringComparison.OrdinalIgnoreCase)) return;
+
+            // Directory Filters
+            if (!ShowWindowsEvents && e.FilePath.Contains(@"\Windows\", StringComparison.OrdinalIgnoreCase))
+            {
+                // If the user UNCHECKS "Show Windows", we hide everything in C:\Windows.
+                // However, user might have CHECKED "Show System32".
+                // If ShowSystem32 is TRUE, we should probably allow it? 
+                // BUT "Windows" is the parent. 
+                // Let's assume hierarchy: If Windows is hidden, EVERYTHING inside is hidden. 
+                // Unless we want complex inclusion logic. 
+                // "exclude any files under Windows directory".
+                
+                // Let's check strict hierarchy.
+                return;
+            }
+
+            if (!ShowSystem32Events && e.FilePath.Contains(@"\Windows\System32\", StringComparison.OrdinalIgnoreCase))
+            {
+                // Special case: PowerShell might be inside System32, check user preference order
+                // The user asked for two checkboxes. If System32 is unchecked, it hides everything in it.
+                // But if they want to hide ONLY PowerShell but SHOW System32, we need to be careful.
+                // User Request: "checkbox System32 default Off to exclude files under Windows\System32"
+                // User Request: "checkbox PowerShell default Off to exclude Windows\System32\WindowsPowerShell"
+                
+                // If System32 is hidden, everything there is hidden (including PS).
+                // If System32 is SHOWN, we check PowerShell specific filter.
+                
+                // Wait, if ShowSystem32 is FALSE (default), it hides System32.
+                // If ShowPowerShell is FALSE (default), it hides PS.
+                
+                // Since PS is usually inside System32, if ShowSystem32 is FALSE, PS is already hidden.
+                // So checking ShowSystem32 first covers it.
+                return;
+            }
+            
+            // If we are here, System32 is SHOWING (or the file is not in System32).
+            // Check PowerShell specifically (e.g. if it's elsewhere or if user enabled System32 but disabled PS)
+            if (!ShowPowerShellEvents && e.FilePath.Contains(@"WindowsPowerShell", StringComparison.OrdinalIgnoreCase)) return;
+
+            _eventQueue.Enqueue(e);
+        }
+
+        private void ProcessEventQueue(object? sender, EventArgs e)
+        {
+            if (_eventQueue.IsEmpty) return;
+
+            // Dequeue all pending items
+            var newEvents = new System.Collections.Generic.List<FileActivityEvent>();
+            while (_eventQueue.TryDequeue(out var ev))
+            {
+                newEvents.Add(ev);
+            }
+
+            // Deduplicate local batch (keep latest for each file)
+            var batchLookup = new System.Collections.Generic.Dictionary<string, FileActivityEvent>();
+            foreach(var item in newEvents)
+            {
+                batchLookup[item.FilePath] = item;
+            }
+
+            foreach (var kvp in batchLookup)
+            {
+                var evt = kvp.Value;
+                if (_activeFileEvents.TryGetValue(evt.FilePath, out var existingEvent))
+                {
+                    // Update existing -> Move to Top
+                    existingEvent.Timestamp = evt.Timestamp;
+                    existingEvent.Operation = evt.Operation;
+                    existingEvent.ProcessName = evt.ProcessName;
+                    existingEvent.UserName = evt.UserName;
+                    
+                    int oldIndex = RecentActivity.IndexOf(existingEvent);
+                    if (oldIndex > 0)
+                    {
+                        RecentActivity.Move(oldIndex, 0);
+                    }
+                }
+                else
+                {
+                     // New Entry
+                    _activeFileEvents[evt.FilePath] = evt;
+                    RecentActivity.Insert(0, evt);
+                }
+            }
+
+            // Enforce Limit after batch update
+            while (RecentActivity.Count > MaxLiveItems)
+            {
+                var last = RecentActivity.Last();
+                RecentActivity.RemoveAt(RecentActivity.Count - 1);
+                _activeFileEvents.Remove(last.FilePath);
+            }
         }
 
         [RelayCommand]

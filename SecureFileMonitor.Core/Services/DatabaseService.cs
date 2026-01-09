@@ -29,6 +29,8 @@ namespace SecureFileMonitor.Core.Services
             await _connection!.CreateTableAsync<FileActivityEvent>();
             await _connection!.CreateTableAsync<FileMetadata>();
             await _connection!.CreateTableAsync<IgnoreRule>();
+            await _connection!.CreateTableAsync<TranscriptionTask>();
+            await _connection!.CreateTableAsync<IgnoredProcess>();
         }
 
         public async Task SaveFileEntryAsync(FileEntry entry)
@@ -46,6 +48,41 @@ namespace SecureFileMonitor.Core.Services
             {
                 await _connection!.InsertAsync(entry);
             }
+        }
+
+        public async Task<List<string>> GetFileTagsAsync(string filePath)
+        {
+            var meta = await _connection!.Table<FileMetadata>().Where(x => x.Tags != null).ToListAsync();
+            // This is actually inefficient, but matches existing pattern for now
+            return meta.Where(m => m.FileId != null).SelectMany(m => m.Tags?.Split(',', StringSplitOptions.RemoveEmptyEntries) ?? Array.Empty<string>()).Select(t => t.Trim()).Distinct().ToList();
+        }
+
+        // Transcription History
+        public async Task SaveTranscriptionTaskAsync(TranscriptionTask task)
+        {
+            await _connection!.InsertOrReplaceAsync(task);
+        }
+
+        public async Task<IEnumerable<TranscriptionTask>> GetAllTranscriptionTasksAsync()
+        {
+            return await _connection!.Table<TranscriptionTask>().ToListAsync();
+        }
+
+        // Ignored Processes
+        public async Task AddIgnoredProcessAsync(string processName)
+        {
+            await _connection!.InsertOrReplaceAsync(new IgnoredProcess { ProcessName = processName });
+        }
+
+        public async Task RemoveIgnoredProcessAsync(string processName)
+        {
+            await _connection!.DeleteAsync<IgnoredProcess>(processName);
+        }
+
+        public async Task<IEnumerable<string>> GetIgnoredProcessesAsync()
+        {
+            var list = await _connection!.Table<IgnoredProcess>().ToListAsync();
+            return list.Select(p => p.ProcessName);
         }
 
         public async Task<FileEntry> GetFileEntryAsync(string filePath)
@@ -161,6 +198,19 @@ namespace SecureFileMonitor.Core.Services
         public async Task<IEnumerable<IgnoreRule>> GetAllIgnoreRulesAsync()
         {
             return await _connection!.Table<IgnoreRule>().ToListAsync();
+        }
+
+        public async Task<List<string>> GetFileTagsAsync(string filePath)
+        {
+            var entry = await GetFileEntryAsync(filePath);
+            if (entry == null) return new List<string>();
+
+            var meta = await GetMetadataAsync(entry.FileId.ToString());
+            if (meta == null || string.IsNullOrWhiteSpace(meta.Tags)) return new List<string>();
+
+            return meta.Tags.Split(',', StringSplitOptions.RemoveEmptyEntries)
+                            .Select(t => t.Trim())
+                            .ToList();
         }
     }
 }

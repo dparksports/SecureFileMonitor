@@ -39,5 +39,8 @@ namespace SecureFileMonitor.Core.Models
 
         [ObservableProperty]
         private DateTime? _completedAt;
+        
+        [ObservableProperty]
+        private string _modelUsed = string.Empty; // e.g., "Whisper Medium (English)"
     }
 }

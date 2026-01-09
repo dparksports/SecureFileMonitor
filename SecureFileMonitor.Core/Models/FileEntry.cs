@@ -25,6 +25,7 @@ namespace SecureFileMonitor.Core.Models
         
         public DateTime CreationTime { get; set; }
         public DateTime LastModified { get; set; }
+        public DateTime LastAccessTime { get; set; }
         
         // Integrity
         public string? CurrentHash { get; set; }

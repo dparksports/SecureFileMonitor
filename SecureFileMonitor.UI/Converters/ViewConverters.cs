@@ -65,4 +65,69 @@ namespace SecureFileMonitor.UI.Converters
             throw new NotImplementedException();
         }
     }
+
+    public class BooleanToVisibilityConverter : IValueConverter
+    {
+        public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+        {
+            if (value is bool b)
+            {
+                bool invert = parameter?.ToString()?.ToUpper() == "INVERSE";
+                if (invert) b = !b;
+                return b ? Visibility.Visible : Visibility.Collapsed;
+            }
+            return Visibility.Collapsed;
+        }
+
+        public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            return value is Visibility v && v == Visibility.Visible;
+        }
+    }
+
+    public class InverseBooleanConverter : IValueConverter
+    {
+        public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+        {
+            if (value is bool b) return !b;
+            return true;
+        }
+
+        public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            if (value is bool b) return !b;
+            return false;
+        }
+    }
+
+    public class BooleanToStatusConverter : IValueConverter
+    {
+        public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+        {
+            if (value is bool b) return b ? "ACTIVE" : "STOPPED";
+            return "UNKNOWN";
+        }
+
+        public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            throw new NotImplementedException();
+        }
+    }
+
+    public class BooleanToStatusColorConverter : IValueConverter
+    {
+        public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+        {
+            if (value is bool b)
+            {
+                return b ? System.Windows.Media.Brushes.SpringGreen : System.Windows.Media.Brushes.Red;
+            }
+            return System.Windows.Media.Brushes.Gray;
+        }
+
+        public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            throw new NotImplementedException();
+        }
+    }
 }

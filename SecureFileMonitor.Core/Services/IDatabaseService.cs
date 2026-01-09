@@ -22,5 +22,16 @@ namespace SecureFileMonitor.Core.Services
         Task AddIgnoreRuleAsync(IgnoreRule rule);
         Task RemoveIgnoreRuleAsync(string path);
         Task<IEnumerable<IgnoreRule>> GetAllIgnoreRulesAsync();
+        
+        Task<List<string>> GetFileTagsAsync(string filePath);
+
+        // Transcription History
+        Task SaveTranscriptionTaskAsync(TranscriptionTask task);
+        Task<IEnumerable<TranscriptionTask>> GetAllTranscriptionTasksAsync();
+        
+        // Ignored Processes
+        Task AddIgnoredProcessAsync(string processName);
+        Task RemoveIgnoredProcessAsync(string processName);
+        Task<IEnumerable<string>> GetIgnoredProcessesAsync();
     }
 }

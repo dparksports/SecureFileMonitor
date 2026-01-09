@@ -1,18 +1,31 @@
 using System;
 using SQLite;
 
+using CommunityToolkit.Mvvm.ComponentModel;
+
 namespace SecureFileMonitor.Core.Models
 {
-    public class FileActivityEvent
+    public partial class FileActivityEvent : ObservableObject
     {
         [PrimaryKey, AutoIncrement]
         public int Id { get; set; }
-        public DateTime Timestamp { get; set; }
+
+        [ObservableProperty]
+        private DateTime _timestamp;
+
         public int ProcessId { get; set; }
-        public string ProcessName { get; set; } = string.Empty;
+        
+        [ObservableProperty]
+        private string _processName = string.Empty;
+
+        [Indexed]
         public string FilePath { get; set; } = string.Empty;
-        public FileOperation Operation { get; set; }
-        public string UserName { get; set; } = string.Empty;
+
+        [ObservableProperty]
+        private FileOperation _operation;
+
+        [ObservableProperty]
+        private string _userName = string.Empty;
     }
 
     public enum FileOperation
