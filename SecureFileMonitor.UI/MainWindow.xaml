@@ -89,6 +89,10 @@
                         Background="{Binding CurrentViewName, Converter={StaticResource ViewToColorConverter}, ConverterParameter=TRANSCRIBE}" 
                         Foreground="White" Padding="10" Margin="0,2,0,0" HorizontalContentAlignment="Left" BorderThickness="0"/>
 
+                <Button Command="{Binding SwitchViewCommand}" CommandParameter="IGNORE_LIST" Content="🚫 IGNORE LIST" 
+                        Background="{Binding CurrentViewName, Converter={StaticResource ViewToColorConverter}, ConverterParameter=IGNORE_LIST}" 
+                        Foreground="White" Padding="10" Margin="0,2,0,0" HorizontalContentAlignment="Left" BorderThickness="0"/>
+
                 <!-- Action Buttons -->
                 <TextBlock Text="AI SERVICES" FontWeight="Bold" Foreground="Gray" Margin="0,20,0,5" FontSize="10"/>
                 <Button Command="{Binding DownloadModelsCommand}" Content="⬇️ Download AI Models" 
@@ -157,6 +161,10 @@
                                               CommandParameter="{Binding Path=PlacementTarget.SelectedItems, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
                                     <MenuItem Header="🎙️ Transcribe Selected" 
                                               Command="{Binding DataContext.TranscribeSelectedFilesCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                              CommandParameter="{Binding Path=PlacementTarget.SelectedItems, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
+                                    <Separator/>
+                                    <MenuItem Header="🚫 Ignore these files" 
+                                              Command="{Binding DataContext.IgnoreSelectedFilesCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                                               CommandParameter="{Binding Path=PlacementTarget.SelectedItems, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
                                 </ContextMenu>
                             </DataGrid.ContextMenu>
@@ -295,6 +303,84 @@
                             <TextBox Grid.Row="1" Text="{Binding SelectedTranscriptionTask.Transcript, Mode=OneWay}" 
                                      Background="Transparent" Foreground="White" BorderThickness="0" 
                                      TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" IsReadOnly="True" Padding="10"/>
+                        </Grid>
+
+                        <!-- Ignore List View -->
+                        <Grid Visibility="{Binding CurrentViewName, Converter={StaticResource ViewToVisibilityConverter}, ConverterParameter=IGNORE_LIST}">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="*"/>
+                            </Grid.RowDefinitions>
+
+                            <Border Grid.Row="0" Background="#222" CornerRadius="4" Padding="15" Margin="0,0,0,10">
+                                <StackPanel>
+                                    <TextBlock Text="MANAGED IGNORE LIST" FontSize="18" FontWeight="Bold" Foreground="White" Margin="0,0,0,5"/>
+                                    <TextBlock Text="Grouped by lowest common parent directory. Click on a path to expand the ignore scope to its parents." Foreground="Gray" TextWrapping="Wrap"/>
+                                </StackPanel>
+                            </Border>
+
+                            <ScrollViewer Grid.Row="1">
+                                <ItemsControl ItemsSource="{Binding IgnoredGroups}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Border Background="#222" Margin="0,0,0,10" CornerRadius="4" Padding="10">
+                                                <StackPanel>
+                                                    <Grid Margin="0,0,0,5">
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="*"/>
+                                                            <ColumnDefinition Width="Auto"/>
+                                                        </Grid.ColumnDefinitions>
+                                                        <StackPanel Orientation="Horizontal">
+                                                            <TextBlock Text="📂 Group:" Foreground="Gray" Margin="0,0,5,0" VerticalAlignment="Center"/>
+                                                            <ItemsControl ItemsSource="{Binding ParentHierarchy}" VerticalAlignment="Center">
+                                                                <ItemsControl.ItemsPanel>
+                                                                    <ItemsPanelTemplate>
+                                                                        <StackPanel Orientation="Horizontal"/>
+                                                                    </ItemsPanelTemplate>
+                                                                </ItemsControl.ItemsPanel>
+                                                                <ItemsControl.ItemTemplate>
+                                                                    <DataTemplate>
+                                                                        <StackPanel Orientation="Horizontal">
+                                                                            <Button Content="{Binding}" Background="Transparent" BorderThickness="0" Foreground="SpringGreen" Padding="2,0"
+                                                                                    Command="{Binding DataContext.ReplaceWithParentIgnoreCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                                                    CommandParameter="{Binding}" Cursor="Hand">
+                                                                                <Button.ToolTip>
+                                                                                    <ToolTip Content="Ignore this entire directory instead"/>
+                                                                                </Button.ToolTip>
+                                                                            </Button>
+                                                                            <TextBlock Text=" > " Foreground="Gray" VerticalAlignment="Center"/>
+                                                                        </StackPanel>
+                                                                    </DataTemplate>
+                                                                </ItemsControl.ItemTemplate>
+                                                            </ItemsControl>
+                                                        </StackPanel>
+                                                        <Button Grid.Column="1" Content="Remove Group" Background="#444" Foreground="White" Padding="10,2"
+                                                                Command="{Binding DataContext.UnignoreGroupCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                                CommandParameter="{Binding}"/>
+                                                    </Grid>
+                                                    
+                                                    <ItemsControl ItemsSource="{Binding Rules}" Margin="20,5,0,0">
+                                                        <ItemsControl.ItemTemplate>
+                                                            <DataTemplate>
+                                                                <Grid Margin="0,2">
+                                                                    <Grid.ColumnDefinitions>
+                                                                        <ColumnDefinition Width="*"/>
+                                                                        <ColumnDefinition Width="Auto"/>
+                                                                    </Grid.ColumnDefinitions>
+                                                                    <TextBlock Text="{Binding Path}" Foreground="LightGray" VerticalAlignment="Center"/>
+                                                                    <Button Grid.Column="1" Content="&#xEF2C;" FontFamily="Segoe MDL2 Assets" Background="Transparent" Foreground="Red" 
+                                                                            BorderThickness="0" Padding="5,0" Command="{Binding DataContext.UnignoreRuleCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                                            CommandParameter="{Binding}"/>
+                                                                </Grid>
+                                                            </DataTemplate>
+                                                        </ItemsControl.ItemTemplate>
+                                                    </ItemsControl>
+                                                </StackPanel>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </ScrollViewer>
                         </Grid>
                     </Grid>
                 </Grid>

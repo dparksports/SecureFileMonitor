@@ -1,3 +1,4 @@
+using System.IO;
 using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -45,6 +46,8 @@ namespace SecureFileMonitor.UI.ViewModels
         [ObservableProperty]
         private TranscriptionTask? _selectedTranscriptionTask;
 
+        public ObservableCollection<IgnoreRule> CurrentIgnoreRules { get; } = new();
+        
         [ObservableProperty]
         private bool _scanReparseFolders = true;
 
@@ -107,6 +110,12 @@ namespace SecureFileMonitor.UI.ViewModels
         {
             var query = AllFiles.AsEnumerable();
 
+            // Ignore Rules Filter
+            var ignoreRules = CurrentIgnoreRules.ToList();
+            query = query.Where(f => !ignoreRules.Any(r => 
+                f.FilePath.Equals(r.Path, StringComparison.OrdinalIgnoreCase) || 
+                (r.IsDirectory && f.FilePath.StartsWith(r.Path, StringComparison.OrdinalIgnoreCase))));
+
             // Type Filter
             if (FileTypeFilter != "All" && FileTypeExtensions.ContainsKey(FileTypeFilter))
             {
@@ -146,6 +155,11 @@ namespace SecureFileMonitor.UI.ViewModels
             {
                 await _dbService.InitializeAsync("SecurePassword123!");
                 
+                // Load Ignore Rules
+                var rules = await _dbService.GetAllIgnoreRulesAsync();
+                CurrentIgnoreRules.Clear();
+                foreach (var rule in rules) CurrentIgnoreRules.Add(rule);
+
                 StatusMessage = "Loading all files from database...";
                 var files = await _dbService.GetAllFilesAsync();
                 AllFiles.Clear();
@@ -226,12 +240,117 @@ namespace SecureFileMonitor.UI.ViewModels
                 
                 StatusMessage = "Scanning C: drive for existing files...";
                 await _scannerService.ScanDriveAsync("C:\\", ScanReparseFolders, new Progress<string>(s => StatusMessage = s), CancellationToken.None);
-                StatusMessage = "Scan Complete. Click 'Load Files' to view.";
+                StatusMessage = "Scan Complete.";
+                await LoadAllFiles(); // Auto-refresh
             }
             catch (Exception ex)
             {
                 StatusMessage = $"Scan Error: {ex.Message}";
             }
+        }
+
+        [RelayCommand]
+        private async Task IgnoreSelectedFiles(System.Collections.IList? selectedItems)
+        {
+            if (selectedItems == null || selectedItems.Count == 0) return;
+
+            foreach (var item in selectedItems.Cast<FileEntry>().ToList())
+            {
+                var rule = new IgnoreRule { Path = item.FilePath, IsDirectory = false };
+                await _dbService.AddIgnoreRuleAsync(rule);
+            }
+
+            await LoadAllFiles(); // Refresh Vault to hide ignored files
+            await RefreshIgnoreList(); // Update Ignore List view
+            StatusMessage = $"Ignored {selectedItems.Count} files.";
+        }
+
+        [RelayCommand]
+        private async Task RefreshIgnoreList()
+        {
+            var rules = await _dbService.GetAllIgnoreRulesAsync();
+            CurrentIgnoreRules.Clear();
+            foreach (var rule in rules) CurrentIgnoreRules.Add(rule);
+            OnPropertyChanged(nameof(IgnoredGroups));
+        }
+
+        public class IgnoreGroup
+        {
+            public string ParentPath { get; set; } = string.Empty;
+            public List<IgnoreRule> Rules { get; set; } = new();
+            public List<string> ParentHierarchy { get; set; } = new();
+        }
+
+        public IEnumerable<IgnoreGroup> IgnoredGroups
+        {
+            get
+            {
+                var groups = new Dictionary<string, IgnoreGroup>();
+                foreach (var rule in CurrentIgnoreRules)
+                {
+                    string parent = Path.GetDirectoryName(rule.Path) ?? rule.Path;
+                    if (!groups.ContainsKey(parent))
+                    {
+                        var group = new IgnoreGroup { ParentPath = parent };
+                        
+                        // Build hierarchy
+                        string? current = parent;
+                        while (!string.IsNullOrEmpty(current))
+                        {
+                            group.ParentHierarchy.Add(current);
+                            current = Path.GetDirectoryName(current);
+                        }
+                        groups[parent] = group;
+                    }
+                    groups[parent].Rules.Add(rule);
+                }
+                return groups.Values;
+            }
+        }
+
+        [RelayCommand]
+        private async Task PromoteIgnoreRule(IgnoreGroup group)
+        {
+            // This is called when user clicks a parent in hierarchy
+            // For now, let's just show a simple way to expand in UI
+            // Implementation details depend on how user selects the new parent
+        }
+
+        [RelayCommand]
+        private async Task UnignoreRule(IgnoreRule rule)
+        {
+            await _dbService.RemoveIgnoreRuleAsync(rule.Path);
+            await RefreshIgnoreList();
+            await LoadAllFiles();
+        }
+
+        [RelayCommand]
+        private async Task UnignoreGroup(IgnoreGroup group)
+        {
+            foreach (var rule in group.Rules)
+            {
+                await _dbService.RemoveIgnoreRuleAsync(rule.Path);
+            }
+            await RefreshIgnoreList();
+            await LoadAllFiles();
+        }
+
+        [RelayCommand]
+        private async Task ReplaceWithParentIgnore(string newParentPath)
+        {
+            // Find all rules that are children of this parent
+            var rules = await _dbService.GetAllIgnoreRulesAsync();
+            var children = rules.Where(r => r.Path.StartsWith(newParentPath, StringComparison.OrdinalIgnoreCase)).ToList();
+
+            foreach (var child in children)
+            {
+                await _dbService.RemoveIgnoreRuleAsync(child.Path);
+            }
+
+            await _dbService.AddIgnoreRuleAsync(new IgnoreRule { Path = newParentPath, IsDirectory = true });
+            await RefreshIgnoreList();
+            await LoadAllFiles();
+            StatusMessage = $"Ignoring directory: {newParentPath}";
         }
 
         [RelayCommand]

@@ -28,6 +28,7 @@ namespace SecureFileMonitor.Core.Services
             await _connection!.CreateTableAsync<FileEntry>();
             await _connection!.CreateTableAsync<FileActivityEvent>();
             await _connection!.CreateTableAsync<FileMetadata>();
+            await _connection!.CreateTableAsync<IgnoreRule>();
         }
 
         public async Task SaveFileEntryAsync(FileEntry entry)
@@ -145,6 +146,21 @@ namespace SecureFileMonitor.Core.Services
         public async Task<IEnumerable<FileEntry>> GetAllFilesAsync()
         {
             return await _connection!.Table<FileEntry>().ToListAsync();
+        }
+
+        public async Task AddIgnoreRuleAsync(IgnoreRule rule)
+        {
+            await _connection!.InsertOrReplaceAsync(rule);
+        }
+
+        public async Task RemoveIgnoreRuleAsync(string path)
+        {
+            await _connection!.DeleteAsync<IgnoreRule>(path);
+        }
+
+        public async Task<IEnumerable<IgnoreRule>> GetAllIgnoreRulesAsync()
+        {
+            return await _connection!.Table<IgnoreRule>().ToListAsync();
         }
     }
 }

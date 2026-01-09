@@ -17,5 +17,10 @@ namespace SecureFileMonitor.Core.Services
         Task<FileMetadata> GetMetadataAsync(string fileId);
         Task<IEnumerable<FileEntry>> SearchFilesAsync(float[] queryVector, int limit = 10);
         Task<IEnumerable<FileEntry>> GetAllFilesAsync();
+
+        // Ignore Rules
+        Task AddIgnoreRuleAsync(IgnoreRule rule);
+        Task RemoveIgnoreRuleAsync(string path);
+        Task<IEnumerable<IgnoreRule>> GetAllIgnoreRulesAsync();
     }
 }

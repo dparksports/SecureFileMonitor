@@ -21,16 +21,25 @@ namespace SecureFileMonitor.Core.Services
         public async Task ScanDriveAsync(string driveLetter, bool scanReparseFolders, IProgress<string> progress, CancellationToken cancellationToken)
         {
             var visitedPaths = new System.Collections.Generic.HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var ignoreRules = (await _dbService.GetAllIgnoreRulesAsync()).ToList();
+
             await Task.Run(async () =>
             {
                 var root = new DirectoryInfo(driveLetter);
-                await ScanDirectoryRecursive(root, scanReparseFolders, visitedPaths, progress, cancellationToken);
+                await ScanDirectoryRecursive(root, scanReparseFolders, visitedPaths, ignoreRules, progress, cancellationToken);
             });
         }
 
-        private async Task ScanDirectoryRecursive(DirectoryInfo directory, bool scanReparseFolders, System.Collections.Generic.HashSet<string> visitedPaths, IProgress<string>? progress, CancellationToken cancellationToken)
+        private async Task ScanDirectoryRecursive(DirectoryInfo directory, bool scanReparseFolders, System.Collections.Generic.HashSet<string> visitedPaths, System.Collections.Generic.List<IgnoreRule> ignoreRules, IProgress<string>? progress, CancellationToken cancellationToken)
         {
             if (cancellationToken.IsCancellationRequested) return;
+
+            // Check if directory is ignored
+            if (ignoreRules.Any(r => directory.FullName.StartsWith(r.Path, StringComparison.OrdinalIgnoreCase)))
+            {
+                _logger.LogInformation($"Skipping ignored directory: {directory.FullName}");
+                return;
+            }
 
             string canonicalPath = directory.FullName.ToLowerInvariant();
             if (visitedPaths.Contains(canonicalPath)) 
@@ -49,15 +58,11 @@ namespace SecureFileMonitor.Core.Services
                 {
                     if (cancellationToken.IsCancellationRequested) return;
 
+                    // Skip ignored files
+                    if (ignoreRules.Any(r => file.FullName.Equals(r.Path, StringComparison.OrdinalIgnoreCase))) continue;
+
                     try
                     {
-                        // Create basic FileEntry
-                        // Note: For existing files, we might not have the exact "FRN" easily without P/Invoke or USN query.
-                        // We will rely on Path as the unique identifier for this scan, OR we map to existing USN entries if possible.
-                        // Simple approach: Upsert based on Path. (Requires DB logic update or careful handling)
-                        // If we want to link to USN Journal, we should ideally query the USN record for this file.
-                        // For now, let's just create the entry.
-                        
                         var entry = new FileEntry
                         {
                             FilePath = file.FullName,
@@ -66,11 +71,10 @@ namespace SecureFileMonitor.Core.Services
                             FileSize = file.Length,
                             CreationTime = file.CreationTimeUtc,
                             LastModified = file.LastWriteTimeUtc,
-                            FileId = 0 // We don't have the FileReferenceNumber easily here without native calls
+                            FileId = 0 
                         };
 
-                        // Optional: Calculate Hash? (Expensive for all files, maybe just QuickHash or size)
-                        entry.CurrentHash = ""; // Deferred hashing
+                        entry.CurrentHash = ""; 
                         
                         await _dbService.SaveFileEntryAsync(entry);
                     }
@@ -87,7 +91,7 @@ namespace SecureFileMonitor.Core.Services
                     // If true, we rely on visitedPaths loop detection.
                     if (!scanReparseFolders && (subDir.Attributes & FileAttributes.ReparsePoint) != 0) continue;
                     
-                    await ScanDirectoryRecursive(subDir, scanReparseFolders, visitedPaths, progress, cancellationToken);
+                    await ScanDirectoryRecursive(subDir, scanReparseFolders, visitedPaths, ignoreRules, progress, cancellationToken);
                 }
             }
             catch (UnauthorizedAccessException)
