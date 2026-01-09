@@ -1,36 +1,59 @@
-# Secure File Monitor
+# 🛡️ Secure File Monitor
 
-![Live Activity Mockup](assets/live_activity_mockup.png)
+Secure File Monitor is a state-of-the-art Windows application designed for high-security environments. It provides real-time oversight of file system integrity, leveraging local AI for deep content analysis without compromising privacy.
 
-**Secure File Monitor** is a high-security, native Windows application designed to provide comprehensive, real-time monitoring of all file activities across mounted drives. Built with a focus on integrity verification and forensic visibility, it tracks creations, modifications, and deletions with precision.
+![Secure File Monitor UI](./assets/main_ui.png)
 
-## Key Features
+## 🌟 Core Features
 
-- **Real-Time Monitoring**: Leverages ETW (Event Tracing for Windows) to capture every file operation across the system with minimal overhead.
-- **Vault Verification**: Maintains a local database of file states, allowing for instant detection of unauthorized changes or "silent" modifications.
-- **Deep Content Analysis**:
-  - **Whisper AI Transcription**: Automatically transcribes audio and video files using OpenAI's Whisper models (locally).
-  - **Semantic Search**: Index and search files by their content description and transcriptions using BERT embeddings.
-  - **GPU Acceleration**: Built-in support for CUDA-enabled GPUs for lightning-fast AI processing.
-- **Advanced Filtering**:
-  - Filter by file type, system directories (Windows/System32), and specific extensions like `.psd1` or `.pnf`.
-  - **Process-Based Ignoring**: Suppress noise by ignoring trusted processes directly from the live feed.
-- **Large File Handling**: Background SHA256 hashing for files larger than 50MB with real-time progress and ETA reporting.
-- **Forensic Detail**: Track not just what changed, but who changed it (User SID/Name) and which process was responsible.
+### 🔍 Semantic Content Search
+Don't just search for filenames; search for **meanings**. Our integrated BERT-based embedding engine allows you to find files based on their actual content.
+- *Example:* Searching for "suspicious network logs" will find relevant files even if they are named "Untitled_1.txt".
 
-## High Security Mode
+### 🎙️ AI Transcription & Vision
+- **Whisper OCR**: High-fidelity transcription of audio and video files. Supports GPU acceleration (CUDA) for blazing-fast local processing.
+- **Video Description (VLM)**: Visual Language Models describe the contents of video files, making visual data searchable.
+- **Privacy First**: All AI processing is 100% local. No data ever leaves your machine.
 
-The application operates in a "High Security Mode," prioritizing data integrity and local processing. All AI models run locally on your machine—no data is sent to the cloud.
+### 🚄 Live System Activity
+Monitors your file system at the kernel level using ETW (Event Tracing for Windows).
+- **Process Tracking**: See exactly which background process (e.g., `cmd.exe`, `powershell.exe`) is creating, modifying, or deleting your files.
+- **Smart Filtering**: Automatically hides noisy system updates while highlighting critical user changes.
+- **True Create Logic**: Distinguishes between opening a file and actually creating one.
 
-## Installation & Requirements
+### 💎 Advanced File Management
+- **Duplicate Finder**: Identify and manage duplicate files based on content hashes (SHA256).
+- **Integrity Vault**: Tracks file history and ensures that modifications are authorized and logged.
+- **Background Hashing**: Efficiently processes large files (>50MB) in the background so your UI remains smooth.
 
-- **OS**: Windows 10/11
-- **Framework**: .NET 8.0 / WPF
-- **Dependencies**: 
-  - FFmpeg (included/downloaded automatically)
-  - SQLite (Local encrypted database)
-  - Whisper.net (Local AI runtime)
+---
 
-## License
+## 🚀 Getting Started
 
-This project is licensed under the Apache License 2.0. See the [LICENSE](LICENSE) file for details.
+### Prerequisites
+- **Windows 10/11** (Admin privileges required for ETW monitoring)
+- **NVIDIA GPU** (Optional, recommended for Whisper CUDA acceleration)
+- **.NET 10 Runtime**
+
+### Installation
+1. Download the latest release from the [Releases](https://github.com/dparksports/SecureFileMonitor/releases) page.
+2. Extract the archive to a secure directory.
+3. Run `SecureFileMonitor.UI.exe` as Administrator.
+4. On first launch, the app will download necessary AI models (Whisper/BERT) locally.
+
+---
+
+## 🛠️ Technology Stack
+- **C# / WPF**: Native Windows performance and aesthetics.
+- **CommunityToolkit.Mvvm**: Robust architecture.
+- **Whisper.net**: Fast, local audio transcription.
+- **Microsoft.ML.OnnxRuntime**: Efficient local model inference.
+- **SQLite (SQLCipher)**: Encrypted storage for all metadata and history.
+- **TraceEvent**: Real-time kernel event processing.
+
+---
+
+## 📄 License
+This project is licensed under the **Apache License 2.0**. See the [LICENSE](./LICENSE) file for details.
+
+Developed with ❤️ for secure environments.
