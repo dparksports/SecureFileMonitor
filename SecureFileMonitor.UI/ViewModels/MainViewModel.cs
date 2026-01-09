@@ -9,6 +9,7 @@ using System.Threading.Tasks;
 using System.Linq;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 
 namespace SecureFileMonitor.UI.ViewModels
 {
@@ -52,6 +53,9 @@ namespace SecureFileMonitor.UI.ViewModels
         private bool _scanReparseFolders = true;
 
         [ObservableProperty]
+        private bool _enableIgnoreList = false;
+
+        [ObservableProperty]
         private string _currentViewName = "VAULT"; // Default to Vault as requested
 
         // Statistics
@@ -89,6 +93,7 @@ namespace SecureFileMonitor.UI.ViewModels
         partial void OnFileTypeFilterChanged(string value) => ApplyFilters();
         partial void OnDateFilterStartChanged(DateTime? value) => ApplyFilters();
         partial void OnDateFilterEndChanged(DateTime? value) => ApplyFilters();
+        partial void OnEnableIgnoreListChanged(bool value) => ApplyFilters();
 
         [RelayCommand]
         public void SwitchView(string viewName)
@@ -111,10 +116,13 @@ namespace SecureFileMonitor.UI.ViewModels
             var query = AllFiles.AsEnumerable();
 
             // Ignore Rules Filter
-            var ignoreRules = CurrentIgnoreRules.ToList();
-            query = query.Where(f => !ignoreRules.Any(r => 
-                f.FilePath.Equals(r.Path, StringComparison.OrdinalIgnoreCase) || 
-                (r.IsDirectory && f.FilePath.StartsWith(r.Path, StringComparison.OrdinalIgnoreCase))));
+            if (EnableIgnoreList)
+            {
+                var ignoreRules = CurrentIgnoreRules.ToList();
+                query = query.Where(f => !ignoreRules.Any(r => 
+                    f.FilePath.Equals(r.Path, StringComparison.OrdinalIgnoreCase) || 
+                    (r.IsDirectory && f.FilePath.StartsWith(r.Path, StringComparison.OrdinalIgnoreCase))));
+            }
 
             // Type Filter
             if (FileTypeFilter != "All" && FileTypeExtensions.ContainsKey(FileTypeFilter))
@@ -159,6 +167,7 @@ namespace SecureFileMonitor.UI.ViewModels
                 var rules = await _dbService.GetAllIgnoreRulesAsync();
                 CurrentIgnoreRules.Clear();
                 foreach (var rule in rules) CurrentIgnoreRules.Add(rule);
+                OnPropertyChanged(nameof(IgnoredGroups));
 
                 StatusMessage = "Loading all files from database...";
                 var files = await _dbService.GetAllFilesAsync();
@@ -238,8 +247,15 @@ namespace SecureFileMonitor.UI.ViewModels
                 StatusMessage = "Initializing database...";
                 await _dbService.InitializeAsync("SecurePassword123!");
                 
-                StatusMessage = "Scanning C: drive for existing files...";
-                await _scannerService.ScanDriveAsync("C:\\", ScanReparseFolders, new Progress<string>(s => StatusMessage = s), CancellationToken.None);
+                StatusMessage = "Scanning all available drives for existing files...";
+                var drives = DriveInfo.GetDrives().Where(d => d.IsReady && (d.DriveType == DriveType.Fixed || d.DriveType == DriveType.Removable || d.DriveType == DriveType.Network));
+                
+                foreach (var drive in drives)
+                {
+                    StatusMessage = $"Scanning {drive.Name}...";
+                    await _scannerService.ScanDriveAsync(drive.Name, ScanReparseFolders, new Progress<string>(s => StatusMessage = s), CancellationToken.None);
+                }
+
                 StatusMessage = "Scan Complete.";
                 await LoadAllFiles(); // Auto-refresh
             }
@@ -374,13 +390,56 @@ namespace SecureFileMonitor.UI.ViewModels
             _ = ProcessTranscriptionQueueAsync();
             CurrentViewName = "TRANSCRIBE";
         }
-
         [RelayCommand]
         private async Task TagSelectedFiles(System.Collections.IList? selectedItems)
         {
             if (selectedItems == null || selectedItems.Count == 0) return;
             SelectedFile = selectedItems.Cast<FileEntry>().FirstOrDefault();
             CurrentViewName = "DETAILS";
+        }
+
+        [RelayCommand]
+        private void OpenInExplorer(FileEntry? file)
+        {
+            if (file == null) return;
+            string path = file.FilePath;
+            if (File.Exists(path))
+            {
+                Process.Start("explorer.exe", $"/select,\"{path}\"");
+            }
+            else if (Directory.Exists(path))
+            {
+                Process.Start("explorer.exe", $"\"{path}\"");
+            }
+        }
+
+        [RelayCommand]
+        private void OpenInVsCode(FileEntry? file)
+        {
+            if (file == null) return;
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = "code",
+                Arguments = $"\"{file.FilePath}\"",
+                UseShellExecute = true,
+                CreateNoWindow = true
+            });
+        }
+
+        [RelayCommand]
+        private void OpenInPowerShell(FileEntry? file)
+        {
+            if (file == null) return;
+            string dir = File.Exists(file.FilePath) ? Path.GetDirectoryName(file.FilePath)! : file.FilePath;
+            Process.Start("powershell.exe", $"-NoExit -Command \"Set-Location -Path '{dir}'\"");
+        }
+
+        [RelayCommand]
+        private void OpenInCmd(FileEntry? file)
+        {
+            if (file == null) return;
+            string dir = File.Exists(file.FilePath) ? Path.GetDirectoryName(file.FilePath)! : file.FilePath;
+            Process.Start("cmd.exe", $"/K \"cd /d \"{dir}\"\"");
         }
 
         private bool _isProcessingQueue = false;
@@ -434,6 +493,9 @@ namespace SecureFileMonitor.UI.ViewModels
 
             // Wire up events
             _etwService.OnFileActivity += EtwService_OnFileActivity;
+
+            // Load initial state
+            _ = LoadAllFiles();
         }
 
         private void EtwService_OnFileActivity(object? sender, FileActivityEvent e)

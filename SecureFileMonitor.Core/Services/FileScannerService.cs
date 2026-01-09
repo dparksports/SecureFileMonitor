@@ -41,10 +41,13 @@ namespace SecureFileMonitor.Core.Services
                 return;
             }
 
+            // More robust canonical path or identity check
             string canonicalPath = directory.FullName.ToLowerInvariant();
             if (visitedPaths.Contains(canonicalPath)) 
             {
-                _logger.LogInformation($"Skipping duplicate or cyclic path: {directory.FullName}");
+                // We only skip if it's a reparse point (loop). 
+                // If it's a normal directory somehow appearing twice, still skip to be safe.
+                _logger.LogInformation($"Skipping already visited path: {directory.FullName}");
                 return;
             }
             visitedPaths.Add(canonicalPath);
@@ -75,7 +78,6 @@ namespace SecureFileMonitor.Core.Services
                         };
 
                         entry.CurrentHash = ""; 
-                        
                         await _dbService.SaveFileEntryAsync(entry);
                     }
                     catch (Exception ex)
@@ -87,20 +89,32 @@ namespace SecureFileMonitor.Core.Services
                 // Recurse
                 foreach (var subDir in directory.EnumerateDirectories())
                 {
-                    // Skip reparse points ONLY if scanReparseFolders is false.
-                    // If true, we rely on visitedPaths loop detection.
-                    if (!scanReparseFolders && (subDir.Attributes & FileAttributes.ReparsePoint) != 0) continue;
+                    bool isReparse = (subDir.Attributes & FileAttributes.ReparsePoint) != 0;
+                    
+                    if (isReparse)
+                    {
+                        if (!scanReparseFolders)
+                        {
+                            _logger.LogInformation($"Skipping reparse point (ScanReparseFolders=False): {subDir.FullName}");
+                            continue;
+                        }
+                        _logger.LogInformation($"Entering reparse point: {subDir.FullName}");
+                    }
                     
                     await ScanDirectoryRecursive(subDir, scanReparseFolders, visitedPaths, ignoreRules, progress, cancellationToken);
                 }
             }
             catch (UnauthorizedAccessException)
             {
-                // Skip restricted directories
+                _logger.LogWarning($"Access denied to: {directory.FullName}");
+            }
+            catch (DirectoryNotFoundException)
+            {
+                _logger.LogWarning($"Directory not found (unlinked?): {directory.FullName}");
             }
             catch (Exception ex)
             {
-                _logger.LogError($"Error scanning directory {directory.FullName}: {ex.Message}");
+                _logger.LogError(ex, $"Error scanning directory: {directory.FullName}");
             }
         }
     }

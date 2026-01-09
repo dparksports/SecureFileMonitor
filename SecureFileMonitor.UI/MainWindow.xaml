@@ -141,12 +141,12 @@
                                     <ComboBoxItem Content="PDF"/>
                                     <ComboBoxItem Content="Text"/>
                                 </ComboBox>
-                                
-                                <TextBlock Text="FROM:" Foreground="Gray" VerticalAlignment="Center" Margin="15,0,5,0"/>
-                                <DatePicker SelectedDate="{Binding DateFilterStart}" Background="#333" Width="100"/>
-                                
-                                <TextBlock Text="TO:" Foreground="Gray" VerticalAlignment="Center" Margin="5,0,5,0"/>
-                                <DatePicker SelectedDate="{Binding DateFilterEnd}" Background="#333" Width="100"/>
+                                <TextBlock Text="Date Range:" VerticalAlignment="Center" Margin="10,0,5,0" Foreground="Gray"/>
+                                <DatePicker SelectedDate="{Binding DateFilterStart}" Width="110" Background="#333" BorderThickness="0" Margin="0,0,5,0"/>
+                                <TextBlock Text="to" VerticalAlignment="Center" Margin="0,0,5,0" Foreground="Gray"/>
+                                <DatePicker SelectedDate="{Binding DateFilterEnd}" Width="110" Background="#333" BorderThickness="0" Margin="0,0,10,0"/>
+
+                                <CheckBox IsChecked="{Binding EnableIgnoreList}" Content="Enable Ignore List" VerticalAlignment="Center" Foreground="Gray"/>
                             </StackPanel>
                         </Grid>
                         
@@ -166,6 +166,19 @@
                                     <MenuItem Header="🚫 Ignore these files" 
                                               Command="{Binding DataContext.IgnoreSelectedFilesCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                                               CommandParameter="{Binding Path=PlacementTarget.SelectedItems, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
+                                    <Separator/>
+                                    <MenuItem Header="📂 Open in Explorer" 
+                                              Command="{Binding DataContext.OpenInExplorerCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                              CommandParameter="{Binding Path=PlacementTarget.SelectedItem, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
+                                    <MenuItem Header="💻 Open in VS Code" 
+                                              Command="{Binding DataContext.OpenInVsCodeCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                              CommandParameter="{Binding Path=PlacementTarget.SelectedItem, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
+                                    <MenuItem Header="🐚 Open in PowerShell" 
+                                              Command="{Binding DataContext.OpenInPowerShellCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                              CommandParameter="{Binding Path=PlacementTarget.SelectedItem, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
+                                    <MenuItem Header="📟 Open in CMD" 
+                                              Command="{Binding DataContext.OpenInCmdCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                              CommandParameter="{Binding Path=PlacementTarget.SelectedItem, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
                                 </ContextMenu>
                             </DataGrid.ContextMenu>
                             <DataGrid.Columns>
@@ -313,10 +326,18 @@
                             </Grid.RowDefinitions>
 
                             <Border Grid.Row="0" Background="#222" CornerRadius="4" Padding="15" Margin="0,0,0,10">
-                                <StackPanel>
-                                    <TextBlock Text="MANAGED IGNORE LIST" FontSize="18" FontWeight="Bold" Foreground="White" Margin="0,0,0,5"/>
-                                    <TextBlock Text="Grouped by lowest common parent directory. Click on a path to expand the ignore scope to its parents." Foreground="Gray" TextWrapping="Wrap"/>
-                                </StackPanel>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel>
+                                        <TextBlock Text="MANAGED IGNORE LIST" FontSize="18" FontWeight="Bold" Foreground="White" Margin="0,0,0,5"/>
+                                        <TextBlock Text="Grouped by lowest common parent directory. Click on a path to expand the ignore scope to its parents." Foreground="Gray" TextWrapping="Wrap"/>
+                                    </StackPanel>
+                                    <Button Grid.Column="1" Command="{Binding RefreshIgnoreListCommand}" Content="🔄 Refresh" 
+                                            Background="#333" Foreground="White" Padding="15,5" VerticalAlignment="Center" BorderThickness="0"/>
+                                </Grid>
                             </Border>
 
                             <ScrollViewer Grid.Row="1">
