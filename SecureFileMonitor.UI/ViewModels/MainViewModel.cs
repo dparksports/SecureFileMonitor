@@ -164,9 +164,6 @@ namespace SecureFileMonitor.UI.ViewModels
         [ObservableProperty]
         private bool _isCudaAvailable;
 
-        [ObservableProperty]
-        private TranscriptionTask? _selectedTranscriptionTask;
-        
         // Ignored Processes
         public ObservableCollection<string> IgnoredProcesses { get; } = new();
 
@@ -972,7 +969,7 @@ namespace SecureFileMonitor.UI.ViewModels
             _eventQueue.Enqueue(e);
         }
 
-        private void ProcessEventQueue(object? sender, EventArgs e)
+        private void ProcessEventQueue(object? sender = null, EventArgs? e = null)
         {
             if (_eventQueue.IsEmpty) return;
 

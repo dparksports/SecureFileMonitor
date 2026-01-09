@@ -304,11 +304,17 @@
                                 </Border>
                             </StackPanel>
 
+                        </Grid>
                     </Grid>
-                </Grid>
 
                     <!-- LIVE ACTIVITY View -->
-                        <Grid Margin="0,0,0,10">
+                    <Grid Visibility="{Binding CurrentViewName, Converter={StaticResource ViewToVisibilityConverter}, ConverterParameter=LIVE}">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                        </Grid.RowDefinitions>
+                        <Grid Grid.Row="0" Margin="0,0,0,10">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*"/>
                                 <ColumnDefinition Width="Auto"/>
@@ -413,6 +419,7 @@
                             </Border>
                         </Grid>
                     </Grid>
+
 
                     <!-- DUPLICATES View -->
                     <Grid Visibility="{Binding CurrentViewName, Converter={StaticResource ViewToVisibilityConverter}, ConverterParameter=DUPLICATES}">

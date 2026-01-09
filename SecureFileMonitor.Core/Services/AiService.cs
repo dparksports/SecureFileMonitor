@@ -171,7 +171,7 @@ namespace SecureFileMonitor.Core.Services
             progress?.Report("AI Models Ready.");
         }
 
-        public async Task<string> TranscribeAudioAsync(string filePath, string modelType = "base", bool isEnglishOnly = true)
+        public async Task<string> TranscribeAudioAsync(string filePath, string modelType = "base", bool isEnglishOnly = true, bool useGpu = true)
         {
             // user request: "if user chooses Medium with English off, then it should download a non-english version... When the english is checked, then download the english version"
             

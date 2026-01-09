@@ -50,12 +50,7 @@ namespace SecureFileMonitor.Core.Services
             }
         }
 
-        public async Task<List<string>> GetFileTagsAsync(string filePath)
-        {
-            var meta = await _connection!.Table<FileMetadata>().Where(x => x.Tags != null).ToListAsync();
-            // This is actually inefficient, but matches existing pattern for now
-            return meta.Where(m => m.FileId != null).SelectMany(m => m.Tags?.Split(',', StringSplitOptions.RemoveEmptyEntries) ?? Array.Empty<string>()).Select(t => t.Trim()).Distinct().ToList();
-        }
+
 
         // Transcription History
         public async Task SaveTranscriptionTaskAsync(TranscriptionTask task)
