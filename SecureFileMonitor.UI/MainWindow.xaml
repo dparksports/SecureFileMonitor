@@ -17,6 +17,8 @@
         <conv:InverseBooleanConverter x:Key="InverseBooleanConverter"/>
         <conv:FileSizeConverter x:Key="FileSizeConverter"/>
         <conv:BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter"/>
+        <conv:BooleanToStatusConverter x:Key="BooleanToStatusConverter"/>
+        <conv:BooleanToStatusColorConverter x:Key="BooleanToStatusColorConverter"/>
         <conv:BindingProxy x:Key="Proxy" Data="{Binding}"/>
         
         <Style TargetType="DataGridColumnHeader">
