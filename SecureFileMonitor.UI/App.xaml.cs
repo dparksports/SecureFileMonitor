@@ -5,6 +5,9 @@ using Microsoft.Extensions.Hosting;
 using Serilog;
 using SecureFileMonitor.Core.Services;
 using SecureFileMonitor.UI.ViewModels;
+using System.Security.Principal;
+using System.Diagnostics;
+using System;
 
 namespace SecureFileMonitor.UI
 {
@@ -19,6 +22,21 @@ namespace SecureFileMonitor.UI
 
         protected override async void OnStartup(StartupEventArgs e)
         {
+            if (!IsAdministrator())
+            {
+                var result = MessageBox.Show(
+                    "This application requires Administrator privileges to monitor the USN Journal and file system events.\n\nWould you like to restart as Administrator?",
+                    "Elevation Required",
+                    MessageBoxButton.YesNo,
+                    MessageBoxImage.Warning);
+
+                if (result == MessageBoxResult.Yes)
+                {
+                    RestartAsAdmin();
+                    return;
+                }
+            }
+
             try
             {
                 Log.Logger = new LoggerConfiguration()
@@ -64,6 +82,37 @@ namespace SecureFileMonitor.UI
             {
                 Log.Fatal(ex, "Application Startup Failed");
                 MessageBox.Show($"Startup Error: {ex.Message}\n\n{ex.StackTrace}", "Critical Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                Shutdown();
+            }
+        }
+
+        private bool IsAdministrator()
+        {
+            using (var identity = WindowsIdentity.GetCurrent())
+            {
+                var principal = new WindowsPrincipal(identity);
+                return principal.IsInRole(WindowsBuiltInRole.Administrator);
+            }
+        }
+
+        private void RestartAsAdmin()
+        {
+            var processInfo = new ProcessStartInfo
+            {
+                FileName = Process.GetCurrentProcess().MainModule?.FileName,
+                UseShellExecute = true,
+                Verb = "runas"
+            };
+
+            try
+            {
+                Process.Start(processInfo);
+                Application.Current.Shutdown();
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, "Failed to restart as administrator");
+                MessageBox.Show("Could not restart with administrator privileges. Please right-click the application and select 'Run as administrator'.", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
                 Shutdown();
             }
         }

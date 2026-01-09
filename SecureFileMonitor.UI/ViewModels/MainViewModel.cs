@@ -40,6 +40,10 @@ namespace SecureFileMonitor.UI.ViewModels
         public ObservableCollection<FileEntry> SearchResults { get; } = new();
         public ObservableCollection<FileEntry> AllFiles { get; } = new();
         public ObservableCollection<FileEntry> FilteredFiles { get; } = new();
+        public ObservableCollection<TranscriptionTask> TranscribeQueue { get; } = new();
+
+        [ObservableProperty]
+        private TranscriptionTask? _selectedTranscriptionTask;
 
         [ObservableProperty]
         private string _currentViewName = "VAULT"; // Default to Vault as requested
@@ -224,6 +228,77 @@ namespace SecureFileMonitor.UI.ViewModels
             catch (Exception ex)
             {
                 StatusMessage = $"Scan Error: {ex.Message}";
+            }
+        }
+
+        [RelayCommand]
+        private async Task TranscribeSelectedFiles(System.Collections.IList? selectedItems)
+        {
+            if (selectedItems == null) return;
+            var files = selectedItems.Cast<FileEntry>().ToList();
+            
+            foreach (var file in files)
+            {
+                string ext = file.FileExtension.ToLowerInvariant();
+                if (FileTypeExtensions["Audio"].Contains(ext) || FileTypeExtensions["Video"].Contains(ext))
+                {
+                    if (!TranscribeQueue.Any(t => t.FilePath == file.FilePath && t.Status != TranscriptionStatus.Completed))
+                    {
+                        TranscribeQueue.Add(new TranscriptionTask { FilePath = file.FilePath, FileName = file.FileName });
+                    }
+                }
+            }
+
+            _ = ProcessTranscriptionQueueAsync();
+            CurrentViewName = "TRANSCRIBE";
+        }
+
+        [RelayCommand]
+        private async Task TagSelectedFiles(System.Collections.IList? selectedItems)
+        {
+            if (selectedItems == null || selectedItems.Count == 0) return;
+            SelectedFile = selectedItems.Cast<FileEntry>().FirstOrDefault();
+            CurrentViewName = "DETAILS";
+        }
+
+        private bool _isProcessingQueue = false;
+        private async Task ProcessTranscriptionQueueAsync()
+        {
+            if (_isProcessingQueue) return;
+            _isProcessingQueue = true;
+
+            try
+            {
+                while (true)
+                {
+                    var task = TranscribeQueue.FirstOrDefault(t => t.Status == TranscriptionStatus.Queued);
+                    if (task == null) break;
+
+                    task.Status = TranscriptionStatus.Processing;
+                    try
+                    {
+                        task.Transcript = await _aiService.TranscribeAudioAsync(task.FilePath);
+                        task.Status = TranscriptionStatus.Completed;
+                        task.CompletedAt = DateTime.Now;
+                        
+                        var file = AllFiles.FirstOrDefault(f => f.FilePath == task.FilePath);
+                        if (file != null)
+                        {
+                            var meta = await _dbService.GetMetadataAsync(file.FileId.ToString()) ?? new FileMetadata { FileId = file.FileId.ToString() };
+                            meta.Transcription = task.Transcript;
+                            await _dbService.SaveMetadataAsync(meta);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        task.Status = TranscriptionStatus.Error;
+                        task.ErrorMessage = ex.Message;
+                    }
+                }
+            }
+            finally
+            {
+                _isProcessingQueue = false;
             }
         }
 
