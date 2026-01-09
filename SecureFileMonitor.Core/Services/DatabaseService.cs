@@ -26,7 +26,8 @@ namespace SecureFileMonitor.Core.Services
             _connection = new SQLiteAsyncConnection(options);
 
             await _connection.CreateTableAsync<FileEntry>();
-            await _connection.CreateTableAsync<FileActivityEvent>(); // Need to ensure Models are SQLite generic compatible
+            await _connection.CreateTableAsync<FileActivityEvent>();
+            await _connection.CreateTableAsync<FileMetadata>();
         }
 
         public async Task SaveFileEntryAsync(FileEntry entry)
@@ -70,6 +71,16 @@ namespace SecureFileMonitor.Core.Services
         public async Task SaveAuditLogAsync(FileActivityEvent activity)
         {
             await _connection.InsertAsync(activity);
+        }
+
+        public async Task SaveMetadataAsync(FileMetadata metadata)
+        {
+            await _connection.InsertOrReplaceAsync(metadata);
+        }
+
+        public async Task<FileMetadata> GetMetadataAsync(string fileId)
+        {
+            return await _connection.Table<FileMetadata>().Where(m => m.FileId == fileId).FirstOrDefaultAsync();
         }
     }
 }

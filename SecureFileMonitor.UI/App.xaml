@@ -1,9 +1,9 @@
 ﻿<Application x:Class="SecureFileMonitor.UI.App"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:local="clr-namespace:SecureFileMonitor.UI">
+             xmlns:converters="clr-namespace:SecureFileMonitor.UI.Converters">
 
     <Application.Resources>
-         
+         <converters:InverseBooleanConverter x:Key="InverseBooleanConverter"/>
     </Application.Resources>
 </Application>

@@ -19,7 +19,15 @@ namespace SecureFileMonitor.UI
 
         protected override async void OnStartup(StartupEventArgs e)
         {
-            _host = Microsoft.Extensions.Hosting.Host.CreateDefaultBuilder()
+            try
+            {
+                Log.Logger = new LoggerConfiguration()
+                    .WriteTo.File("logs/startup_log.txt")
+                    .CreateLogger();
+
+                Log.Information("Starting Host...");
+
+                _host = Microsoft.Extensions.Hosting.Host.CreateDefaultBuilder()
                 .UseSerilog((context, services, configuration) => configuration
                     .WriteTo.File("logs/log.txt", rollingInterval: RollingInterval.Day))
                 .ConfigureServices((context, services) =>
@@ -30,6 +38,7 @@ namespace SecureFileMonitor.UI
                     services.AddSingleton<IDatabaseService, SecureFileMonitor.Core.Services.DatabaseService>();
                     services.AddSingleton<IHasherService, SecureFileMonitor.Core.Services.CpuHasherService>();
                     services.AddSingleton<IMerkleTreeService, SecureFileMonitor.Core.Services.MerkleTreeService>();
+                    services.AddSingleton<IAiService, SecureFileMonitor.Core.Services.AiService>();
 
                     // ViewModels
                     services.AddSingleton<SecureFileMonitor.UI.ViewModels.MainViewModel>();
@@ -39,12 +48,23 @@ namespace SecureFileMonitor.UI
                 })
                 .Build();
 
-            await _host.StartAsync();
+                Log.Information("Host Built. Starting...");
+                await _host.StartAsync();
+                Log.Information("Host Started.");
 
-            var mainWindow = _host.Services.GetRequiredService<MainWindow>();
-            mainWindow.Show();
+                var mainWindow = _host.Services.GetRequiredService<MainWindow>();
+                this.MainWindow = mainWindow; // Tell WPF this is the main window
+                Log.Information("Showing MainWindow...");
+                mainWindow.Show();
 
-            base.OnStartup(e);
+                base.OnStartup(e);
+            }
+            catch (Exception ex)
+            {
+                Log.Fatal(ex, "Application Startup Failed");
+                MessageBox.Show($"Startup Error: {ex.Message}\n\n{ex.StackTrace}", "Critical Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                Shutdown();
+            }
         }
 
         protected override async void OnExit(ExitEventArgs e)
