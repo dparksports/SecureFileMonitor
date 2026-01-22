@@ -21,10 +21,11 @@ Monitors your file system at the kernel level using ETW (Event Tracing for Windo
 - **Smart Filtering**: Automatically hides noisy system updates while highlighting critical user changes.
 - **True Create Logic**: Distinguishes between opening a file and actually creating one.
 
-### 💎 Advanced File Management
-- **Duplicate Finder**: Identify and manage duplicate files based on content hashes (SHA256).
-- **Integrity Vault**: Tracks file history and ensures that modifications are authorized and logged.
-- **Background Hashing**: Efficiently processes large files (>50MB) in the background so your UI remains smooth.
+### 🛡️ Forensic Integrity Monitoring
+- **Smart Integrity Scanning**: Detects files created, deleted, or modified while the application was offline.
+- **Merkle Tree Granular Diffing**: Identifies exactly which blocks of a file were modified (4MB block granularity), enabling forensic analysis of tampered data.
+- **Persistent Forensic Logs**: All offline changes are logged to an encrypted database with a strong audit trail that survives application restarts.
+- **Background Hashing**: Efficiently processes large files (>50MB) in the background so your UI remains smooth using SHA256.
 
 ---
 
