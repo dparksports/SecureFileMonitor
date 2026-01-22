@@ -81,6 +81,9 @@
                 <Button Command="{Binding SwitchViewCommand}" CommandParameter="DUPLICATES" Content="👯 DUPLICATES" 
                         Background="{Binding CurrentViewName, Converter={StaticResource ViewToColorConverter}, ConverterParameter=DUPLICATES}" 
                         Foreground="White" Padding="10" Margin="0,2,0,0" HorizontalContentAlignment="Left" BorderThickness="0"/>
+                <Button Command="{Binding SwitchViewCommand}" CommandParameter="FILES_CHANGES" Content="🕒 FILES CHANGES" 
+                        Background="{Binding CurrentViewName, Converter={StaticResource ViewToColorConverter}, ConverterParameter=FILES_CHANGES}" 
+                        Foreground="White" Padding="10" Margin="0,2,0,0" HorizontalContentAlignment="Left" BorderThickness="0"/>
                 <Button Command="{Binding SwitchViewCommand}" CommandParameter="SEARCH" Content="🔍 SEMANTIC SEARCH" 
                         Background="{Binding CurrentViewName, Converter={StaticResource ViewToColorConverter}, ConverterParameter=SEARCH}" 
                         Foreground="White" Padding="10" Margin="0,2,0,0" HorizontalContentAlignment="Left" BorderThickness="0"/>
@@ -422,6 +425,39 @@
                         </Grid>
                     </Grid>
 
+
+                    <Grid Visibility="{Binding CurrentViewName, Converter={StaticResource ViewToVisibilityConverter}, ConverterParameter=FILES_CHANGES}">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                        </Grid.RowDefinitions>
+
+                        <StackPanel Orientation="Horizontal" Margin="0,10,0,10">
+                             <TextBlock Text="OFFLINE FILE CHANGES HISTORY" FontWeight="SemiBold" Foreground="LightGray" VerticalAlignment="Center" Margin="0,0,20,0"/>
+                             
+                             <TextBlock Text="Load Last:" Foreground="Gray" VerticalAlignment="Center" Margin="0,0,5,0"/>
+                             <TextBox Text="{Binding MaxOfflineItems, UpdateSourceTrigger=PropertyChanged}" Width="50" Background="#333" Foreground="White" BorderThickness="1" BorderBrush="#555" Padding="2" VerticalContentAlignment="Center" Margin="0,0,10,0"/>
+                             <TextBlock Text="Events" Foreground="Gray" VerticalAlignment="Center" Margin="0,0,15,0"/>
+                             
+                             <Button Command="{Binding LoadOfflineHistoryCommand}" Content="🔄 Reload History" Background="#333" Foreground="White" Padding="10,2" BorderThickness="0"/>
+                        </StackPanel>
+                        
+                        <DataGrid Grid.Row="1" ItemsSource="{Binding OfflineActivity}" SelectedItem="{Binding SelectedOfflineEvent}" AutoGenerateColumns="False" 
+                                  Background="Transparent" BorderThickness="0" HeadersVisibility="Column"
+                                  IsReadOnly="True" RowBackground="#222" AlternatingRowBackground="#2A2A2A" Foreground="White">
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="Modified Time" Binding="{Binding Timestamp, StringFormat=yyyy-MM-dd HH:mm:ss}" Width="150"/>
+                                <DataGridTextColumn Header="Operation" Binding="{Binding Operation}" Width="100"/>
+                                <DataGridTextColumn Header="Path" Binding="{Binding FilePath}" Width="*"/>
+                                <DataGridTextColumn Header="Details" Binding="{Binding Details}" Width="200"/>
+                            </DataGrid.Columns>
+                           <DataGrid.ContextMenu>
+                                <ContextMenu>
+                                    <MenuItem Header="🔍 Show Analysis Details" Command="{Binding ShowOfflineEventDetailsCommand}"/>
+                                </ContextMenu>
+                           </DataGrid.ContextMenu>
+                        </DataGrid>
+                    </Grid>
 
                     <!-- DUPLICATES View -->
                     <Grid Visibility="{Binding CurrentViewName, Converter={StaticResource ViewToVisibilityConverter}, ConverterParameter=DUPLICATES}">

@@ -26,6 +26,9 @@ namespace SecureFileMonitor.Core.Models
 
         [ObservableProperty]
         private string _userName = string.Empty;
+
+        [ObservableProperty]
+        private string _details = string.Empty;
     }
 
     public enum FileOperation

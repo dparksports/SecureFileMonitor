@@ -8,5 +8,7 @@ namespace SecureFileMonitor.Core.Services
         Task<MerkleNode> BuildTreeAsync(string filePath);
         string CalculateRoot(string[] leafHashes);
         List<int> GetChangedBlocks(MerkleNode oldTree, MerkleNode newTree);
+        string SerializeTree(MerkleNode root);
+        MerkleNode? DeserializeTree(string json);
     }
 }

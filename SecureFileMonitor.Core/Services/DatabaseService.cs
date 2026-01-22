@@ -12,6 +12,7 @@ namespace SecureFileMonitor.Core.Services
     {
         private SQLiteAsyncConnection? _connection;
         private readonly string _dbPath;
+        private readonly int _offlineEventLimit = 1000; // Safeguard limit for queries
 
         public DatabaseService()
         {
@@ -31,6 +32,7 @@ namespace SecureFileMonitor.Core.Services
             await _connection!.CreateTableAsync<IgnoreRule>();
             await _connection!.CreateTableAsync<TranscriptionTask>();
             await _connection!.CreateTableAsync<IgnoredProcess>();
+            await _connection!.CreateTableAsync<FileMerkleTree>();
         }
 
         public async Task SaveFileEntryAsync(FileEntry entry)
@@ -48,6 +50,17 @@ namespace SecureFileMonitor.Core.Services
             {
                 await _connection!.InsertAsync(entry);
             }
+        }
+
+        public async Task DeleteFileEntryAsync(string filePath)
+        {
+             // Assumes FilePath is primary key or unique index
+             // Since FileEntry might not have [PrimaryKey] on FilePath (FileId is FRN?), we use explicit delete by query
+             var entry = await GetFileEntryAsync(filePath);
+             if (entry != null)
+             {
+                 await _connection!.DeleteAsync(entry);
+             }
         }
 
 
@@ -104,6 +117,20 @@ namespace SecureFileMonitor.Core.Services
         public async Task SaveAuditLogAsync(FileActivityEvent activity)
         {
             await _connection!.InsertAsync(activity);
+        }
+
+        public async Task<List<FileActivityEvent>> GetRecentOfflineActivityAsync(int limit)
+        {
+            // Cap limit to safeguard
+            int safeLimit = Math.Min(limit, _offlineEventLimit);
+
+            // Fetch events where ProcessName indicates offline changes (System (Offline) or Scanner (Offline Detection))
+            // Order by Timestamp Descending
+            return await _connection!.Table<FileActivityEvent>()
+                                     .Where(e => e.ProcessName == "System (Offline)" || e.ProcessName == "Scanner (Offline Detection)")
+                                     .OrderByDescending(e => e.Timestamp)
+                                     .Take(safeLimit)
+                                     .ToListAsync();
         }
 
         public async Task SaveMetadataAsync(FileMetadata metadata)
@@ -206,6 +233,15 @@ namespace SecureFileMonitor.Core.Services
             return meta.Tags.Split(',', StringSplitOptions.RemoveEmptyEntries)
                             .Select(t => t.Trim())
                             .ToList();
+        }
+        public async Task SaveMerkleTreeAsync(FileMerkleTree tree)
+        {
+            await _connection!.InsertOrReplaceAsync(tree);
+        }
+
+        public async Task<FileMerkleTree> GetMerkleTreeAsync(string filePath)
+        {
+            return await _connection!.Table<FileMerkleTree>().Where(mt => mt.FilePath == filePath).FirstOrDefaultAsync();
         }
     }
 }

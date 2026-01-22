@@ -9,9 +9,11 @@ namespace SecureFileMonitor.Core.Services
         Task InitializeAsync(string password);
         Task SaveFileEntryAsync(FileEntry entry);
         Task<FileEntry> GetFileEntryAsync(string filePath);
+        Task DeleteFileEntryAsync(string filePath);
         Task<IEnumerable<FileEntry>> GetAllEntriesAsync();
         Task<IEnumerable<FileEntry>> GetDuplicateFilesAsync();
         Task SaveAuditLogAsync(FileActivityEvent activity);
+        Task<List<FileActivityEvent>> GetRecentOfflineActivityAsync(int limit);
         
         Task SaveMetadataAsync(FileMetadata metadata);
         Task<FileMetadata> GetMetadataAsync(string fileId);
@@ -33,5 +35,9 @@ namespace SecureFileMonitor.Core.Services
         Task AddIgnoredProcessAsync(string processName);
         Task RemoveIgnoredProcessAsync(string processName);
         Task<IEnumerable<string>> GetIgnoredProcessesAsync();
+        
+        // Merkle Trees
+        Task SaveMerkleTreeAsync(FileMerkleTree tree);
+        Task<FileMerkleTree> GetMerkleTreeAsync(string filePath);
     }
 }

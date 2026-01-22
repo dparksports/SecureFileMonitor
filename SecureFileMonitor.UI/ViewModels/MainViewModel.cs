@@ -38,6 +38,7 @@ namespace SecureFileMonitor.UI.ViewModels
         }
 
         public ObservableCollection<FileActivityEvent> RecentActivity { get; } = new();
+        public ObservableCollection<FileActivityEvent> OfflineActivity { get; } = new();
         public ObservableCollection<FileEntry> DuplicateFiles { get; } = new();
         public ObservableCollection<FileEntry> SearchResults { get; } = new();
         public ObservableCollection<FileEntry> AllFiles { get; } = new();
@@ -124,6 +125,28 @@ namespace SecureFileMonitor.UI.ViewModels
         private int _maxLiveItems = 50;
 
         [ObservableProperty]
+        private int _maxOfflineItems = 50;
+
+        async partial void OnMaxOfflineItemsChanged(int value)
+        {
+            await LoadOfflineHistory();
+        }
+
+        [RelayCommand]
+        public async Task LoadOfflineHistory()
+        {
+             var history = await _dbService.GetRecentOfflineActivityAsync(MaxOfflineItems);
+             System.Windows.Application.Current.Dispatcher.Invoke(() =>
+             {
+                 OfflineActivity.Clear();
+                 foreach (var evt in history)
+                 {
+                     OfflineActivity.Add(evt);
+                 }
+             });
+        }
+
+        [ObservableProperty]
         private bool _showDllEvents = false; // Default Off
 
         [ObservableProperty]
@@ -131,6 +154,20 @@ namespace SecureFileMonitor.UI.ViewModels
 
         [ObservableProperty]
         private bool _showMuiEvents = false; // Default Off
+
+        [ObservableProperty]
+        private FileActivityEvent? _selectedOfflineEvent;
+
+        [RelayCommand]
+        public void ShowOfflineEventDetails()
+        {
+            if (SelectedOfflineEvent == null) return;
+            System.Windows.MessageBox.Show(
+                $"File: {SelectedOfflineEvent.FilePath}\n\nChange Details:\n{SelectedOfflineEvent.Details}", 
+                "Offline Change Analysis", 
+                System.Windows.MessageBoxButton.OK, 
+                System.Windows.MessageBoxImage.Information);
+        }
 
         [ObservableProperty]
         private bool _showPsd1Events = false; // Default Off
@@ -1110,7 +1147,49 @@ namespace SecureFileMonitor.UI.ViewModels
 
             StatusMessage = "Starting USN Journal Reader for all drives...";
             await _usnService.InitializeAllDrivesAsync();
-            // Start reading history...
+
+            // Load historical offline changes from DB first
+            StatusMessage = "Loading offline history...";
+            await LoadOfflineHistory();
+            
+            // --- OFFLINE CHANGE DETECTION ---
+            StatusMessage = "Checking for offline changes...";
+            await Task.Run(() =>
+            {
+                var drives = DriveInfo.GetDrives().Where(d => d.IsReady && (d.DriveType == DriveType.Fixed || d.DriveType == DriveType.Removable));
+                foreach (var drive in drives)
+                {
+                    try
+                    {
+                        var changes = _usnService.ReadChanges(drive.Name);
+                        foreach (var change in changes)
+                        {
+                            var evt = new FileActivityEvent
+                            {
+                                Timestamp = change.LastModified,
+                                FilePath = string.IsNullOrEmpty(change.FilePath) ? Path.Combine(drive.Name, change.FileName) : change.FilePath,
+                                ProcessId = 0,
+                                ProcessName = "System (Offline)",
+                                UserName = "System",
+                                Operation = FileOperation.Write // USN mostly tracks writes/changes
+                            };
+
+                             // Dispatch to UI
+                            System.Windows.Application.Current.Dispatcher.Invoke(() =>
+                            {
+                                OfflineActivity.Insert(0, evt);
+                            });
+                            
+                            // Also log to DB
+                             _dbService.SaveAuditLogAsync(evt).Wait();
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"Error reading USN for {drive.Name}: {ex.Message}");
+                    }
+                }
+            });
 
             StatusMessage = "Starting Real-time ETW Monitor...";
             _etwService.Start();

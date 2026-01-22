@@ -13,6 +13,17 @@ namespace SecureFileMonitor.Core.Services
         private readonly IHasherService _hasherService;
         private const int BlockSize = 4 * 1024 * 1024; // 4MB
 
+        public string SerializeTree(MerkleNode root)
+        {
+            return System.Text.Json.JsonSerializer.Serialize(root);
+        }
+
+        public MerkleNode? DeserializeTree(string json)
+        {
+            if (string.IsNullOrEmpty(json)) return null;
+            return System.Text.Json.JsonSerializer.Deserialize<MerkleNode>(json);
+        }
+
         public MerkleTreeService(IHasherService hasherService)
         {
             _hasherService = hasherService;

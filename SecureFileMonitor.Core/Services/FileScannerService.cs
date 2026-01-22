@@ -13,6 +13,7 @@ namespace SecureFileMonitor.Core.Services
     public class FileScannerService : IFileScannerService
     {
         private readonly IDatabaseService _dbService;
+        private readonly IMerkleTreeService _merkleService;
         private readonly ILogger<FileScannerService> _logger;
         
         // Large file hash queue (thread-safe)
@@ -21,9 +22,13 @@ namespace SecureFileMonitor.Core.Services
         
         public event EventHandler<(int Remaining, int Total, TimeSpan? ETA)>? OnHashProgressChanged;
 
-        public FileScannerService(IDatabaseService dbService, ILogger<FileScannerService> logger)
+        public FileScannerService(
+            IDatabaseService dbService,
+            IMerkleTreeService merkleService, 
+            ILogger<FileScannerService> logger)
         {
             _dbService = dbService;
+            _merkleService = merkleService;
             _logger = logger;
         }
         
@@ -62,7 +67,18 @@ namespace SecureFileMonitor.Core.Services
             await Task.Run(async () =>
             {
                 var root = new DirectoryInfo(driveLetter);
-                await ScanDirectoryRecursive(root, scanReparseFolders, visitedPaths, ignoreRules, progress, cancellationToken, state);
+                
+                // Track all found files to detect deletions later
+                var foundFiles = new System.Collections.Generic.HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+                await ScanDirectoryRecursive(root, scanReparseFolders, visitedPaths, ignoreRules, progress, cancellationToken, state, foundFiles);
+
+                // --- DELETED FILE DETECTION ---
+                if (!cancellationToken.IsCancellationRequested)
+                {
+                    progress?.Report(("Checking for deleted files...", null, null));
+                    await CheckForDeletedFilesAsync(driveLetter, foundFiles, ignoreRules);
+                }
             });
         }
 
@@ -71,15 +87,16 @@ namespace SecureFileMonitor.Core.Services
             System.Collections.Generic.List<IgnoreRule> ignoreRules, 
             IProgress<(string Status, double? Percent, TimeSpan? ETA)>? progress, 
             CancellationToken cancellationToken,
-            ScanState state)
+            ScanState state,
+            System.Collections.Generic.HashSet<string> foundFiles)
         {
             if (cancellationToken.IsCancellationRequested) return;
 
-            // Check if directory is ignored
-            if (ignoreRules.Any(r => directory.FullName.StartsWith(r.Path, StringComparison.OrdinalIgnoreCase)))
-            {
-                return;
-            }
+            if (cancellationToken.IsCancellationRequested) return;
+
+            // REMOVED: Do NOT skip ignored directories. Scan them, but don't Alert on them.
+            // Check if directory is ignored (for event logging purposes only)
+            bool isIgnoredDir = ignoreRules.Any(r => directory.FullName.StartsWith(r.Path, StringComparison.OrdinalIgnoreCase));
 
             string canonicalPath = directory.FullName.ToLowerInvariant();
             if (visitedPaths.Contains(canonicalPath)) return;
@@ -116,12 +133,16 @@ namespace SecureFileMonitor.Core.Services
                 foreach (var file in directory.EnumerateFiles("*", enumOptions))
                 {
                     if (cancellationToken.IsCancellationRequested) return;
+                    
+                    // Track existence
+                    foundFiles.Add(file.FullName);
+                    if (cancellationToken.IsCancellationRequested) return;
 
                     // Update processed bytes
                     Interlocked.Add(ref state.ProcessedBytes, file.Length);
 
-                    // Skip ignored files
-                    if (ignoreRules.Any(r => file.FullName.Equals(r.Path, StringComparison.OrdinalIgnoreCase))) continue;
+                    // Check if file is ignored (for LOGGING only)
+                    bool isIgnoredFile = ignoreRules.Any(r => file.FullName.Equals(r.Path, StringComparison.OrdinalIgnoreCase));
 
                     try
                     {
@@ -137,7 +158,111 @@ namespace SecureFileMonitor.Core.Services
                             FileId = 0 
                         };
 
-                        entry.CurrentHash = await CalculateHashAsync(file.FullName, cancellationToken);
+                        var existingEntry = await _dbService.GetFileEntryAsync(file.FullName);
+                        bool needsHashing = true;
+
+                        if (existingEntry != null)
+                        {
+                            // EXISTING FILE: Optimization Check
+                            if (existingEntry.LastModified == file.LastWriteTimeUtc && existingEntry.FileSize == file.Length)
+                            {
+                                needsHashing = false;
+                                entry.CurrentHash = existingEntry.CurrentHash; 
+                            }
+                        }
+
+                        if (needsHashing)
+                        {
+                            string newHash = await CalculateHashAsync(file.FullName, cancellationToken);
+                            entry.CurrentHash = newHash;
+
+                            // Calculate and Save Merkle Tree (if not pending)
+                            if (newHash != "PENDING")
+                            {
+                                try 
+                                {
+                                    var tree = await _merkleService.BuildTreeAsync(file.FullName);
+                                    var fileMerkle = new FileMerkleTree 
+                                    { 
+                                        FilePath = file.FullName,
+                                        SerializedTree = _merkleService.SerializeTree(tree),
+                                        LastUpdated = DateTime.Now
+                                    };
+                                    await _dbService.SaveMerkleTreeAsync(fileMerkle);
+                                } 
+                                catch (Exception ex) { _logger.LogWarning($"Merkle gen failed: {ex.Message}"); }
+                            }
+
+                            if (existingEntry != null)
+                            {
+                                // CHECK FOR MODIFICATION
+                                if (existingEntry.CurrentHash != newHash && newHash != "PENDING" && existingEntry.CurrentHash != "PENDING") 
+                                { 
+                                    // Modified Event
+                                    if (!isIgnoredDir && !isIgnoredFile)
+                                    {
+                                        string diffDetails = "Modified (No granular details available)";
+                                        try 
+                                        {
+                                            // 1. Get Old Tree
+                                            var oldTreeRecord = await _dbService.GetMerkleTreeAsync(file.FullName);
+                                            var newTree = await _merkleService.BuildTreeAsync(file.FullName); // Re-build or reuse if possible
+                                            
+                                            // Note: We built 'tree' above in the try block but it's scoped there. 
+                                            // Refactoring a bit to reuse 'tree' would be cleaner, but lets stick to logic flow.
+                                            
+                                            if (oldTreeRecord != null)
+                                            {
+                                                var oldRoot = _merkleService.DeserializeTree(oldTreeRecord.SerializedTree);
+                                                if (oldRoot != null)
+                                                {
+                                                    // 2. Compute Diff
+                                                    var changedBlocks = _merkleService.GetChangedBlocks(oldRoot, newTree);
+                                                    if (changedBlocks.Count > 0)
+                                                    {
+                                                        if (changedBlocks.Count > 10)
+                                                            diffDetails = $"{changedBlocks.Count} blocks changed. (Indices: {string.Join(", ", changedBlocks.Take(10))}...)";
+                                                        else
+                                                            diffDetails = $"Blocks changed: {string.Join(", ", changedBlocks)}";
+                                                    }
+                                                }
+                                            }
+                                        } 
+                                        catch { /* Fallback to generic message */ }
+
+                                        var evt = new FileActivityEvent
+                                        {
+                                            Timestamp = DateTime.Now,
+                                            Operation = FileOperation.Write, 
+                                            FilePath = file.FullName,
+                                            ProcessName = "Scanner (Offline Detection)", 
+                                            ProcessId = 0,
+                                            UserName = "System",
+                                            Details = diffDetails
+                                        };
+                                        await _dbService.SaveAuditLogAsync(evt);
+                                    }
+                                }
+                            }
+                            else
+                            {
+                                // NEW FILE (Detected Offline)
+                                if (newHash != "PENDING" && !isIgnoredDir && !isIgnoredFile)
+                                {
+                                    var evt = new FileActivityEvent
+                                    {
+                                        Timestamp = DateTime.Now,
+                                        Operation = FileOperation.Create,
+                                        FilePath = file.FullName,
+                                        ProcessName = "Scanner (Offline Detection)",
+                                        ProcessId = 0,
+                                        UserName = "System"
+                                    };
+                                    await _dbService.SaveAuditLogAsync(evt);
+                                }
+                            }
+                        }
+
                         await _dbService.SaveFileEntryAsync(entry);
                     }
                     catch (Exception ex)
@@ -158,7 +283,7 @@ namespace SecureFileMonitor.Core.Services
                         continue;
                     }
                     
-                    await ScanDirectoryRecursive(subDir, scanReparseFolders, visitedPaths, ignoreRules, progress, cancellationToken, state);
+                    await ScanDirectoryRecursive(subDir, scanReparseFolders, visitedPaths, ignoreRules, progress, cancellationToken, state, foundFiles);
                 }
             }
             catch (UnauthorizedAccessException) { }
@@ -182,9 +307,9 @@ namespace SecureFileMonitor.Core.Services
                     return "PENDING"; // Mark as pending
                 }
 
-                using var md5 = MD5.Create();
+                using var sha256 = SHA256.Create();
                 using var stream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
-                byte[] hash = await md5.ComputeHashAsync(stream, cancellationToken);
+                byte[] hash = await sha256.ComputeHashAsync(stream, cancellationToken);
                 return BitConverter.ToString(hash).Replace("-", "").ToLowerInvariant();
             }
             catch
@@ -252,9 +377,49 @@ namespace SecureFileMonitor.Core.Services
                 }
             }
             
-            // Reset counter for next scan
-            Interlocked.Exchange(ref _totalLargeFilesQueued, 0);
             progress?.Report(("Background hashing complete.", 0, total, null));
+        }
+
+        private async Task CheckForDeletedFilesAsync(string driveLetter, System.Collections.Generic.HashSet<string> foundFiles, System.Collections.Generic.List<IgnoreRule> ignoreRules)
+        {
+            try 
+            {
+                // Fetch all DB entries for this drive (naive substring match for now, ideally DB query filters)
+                var allEntries = await _dbService.GetAllFilesAsync();
+                var driveEntries = allEntries.Where(e => e.FilePath.StartsWith(driveLetter, StringComparison.OrdinalIgnoreCase)).ToList();
+
+                foreach (var entry in driveEntries)
+                {
+                    if (!foundFiles.Contains(entry.FilePath))
+                    {
+                        // File is in DB but not found on disk -> DELETED
+                        
+                        // Check ignore rules (logging only)
+                        bool isIgnored = ignoreRules.Any(r => entry.FilePath.StartsWith(r.Path, StringComparison.OrdinalIgnoreCase));
+
+                        if (!isIgnored)
+                        {
+                            var evt = new FileActivityEvent
+                            {
+                                Timestamp = DateTime.Now,
+                                Operation = FileOperation.Delete,
+                                FilePath = entry.FilePath,
+                                ProcessName = "Scanner (Offline Detection)",
+                                ProcessId = 0,
+                                UserName = "System"
+                            };
+                            await _dbService.SaveAuditLogAsync(evt);
+                        }
+
+                        // Remove from DB
+                        await _dbService.DeleteFileEntryAsync(entry.FilePath);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                 _logger.LogWarning($"Error checking deleted files: {ex.Message}");
+            }
         }
     }
 }
