@@ -19,6 +19,7 @@ namespace SecureFileMonitor.UI.ViewModels
         private readonly IEtwMonitorService _etwService;
         private readonly IDatabaseService _dbService;
         private readonly IAiService _aiService;
+        private readonly IAnalyticsService _analyticsService;
 
         [ObservableProperty]
         private string _statusMessage = "Ready";
@@ -162,6 +163,9 @@ namespace SecureFileMonitor.UI.ViewModels
         public void ShowOfflineEventDetails()
         {
             if (SelectedOfflineEvent == null) return;
+            
+            _analyticsService.LogEventAsync("view_offline_details");
+
             System.Windows.MessageBox.Show(
                 $"File: {SelectedOfflineEvent.FilePath}\n\nChange Details:\n{SelectedOfflineEvent.Details}", 
                 "Offline Change Analysis", 
@@ -904,13 +908,29 @@ namespace SecureFileMonitor.UI.ViewModels
 
         }
 
-        public MainViewModel(IUsnJournalService usnService, IEtwMonitorService etwService, IDatabaseService dbService, IAiService aiService, IFileScannerService scannerService)
+
+        private readonly IMerkleTreeService _merkleService;
+
+        public MainViewModel(IUsnJournalService usnService, IEtwMonitorService etwService, IDatabaseService dbService,
+            IMerkleTreeService merkleService,
+            IAiService aiService,
+            IFileScannerService scannerService,
+            IAnalyticsService analyticsService)
         {
             _usnService = usnService;
             _etwService = etwService;
             _dbService = dbService;
             _aiService = aiService;
+            _merkleService = merkleService;
             _scannerService = scannerService;
+            _analyticsService = analyticsService;
+
+            // Log App Launch
+            _analyticsService.LogEventAsync("app_launch", new Dictionary<string, object>
+            {
+                { "os_version", Environment.OSVersion.ToString() },
+                { "app_version", "1.1.0" }
+            });
 
             IsCudaAvailable = _aiService.IsCudaAvailable;
 

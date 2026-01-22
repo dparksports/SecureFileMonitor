@@ -42,6 +42,8 @@ namespace SecureFileMonitor.UI
                     services.AddSingleton<IHasherService, SecureFileMonitor.Core.Services.CpuHasherService>();
                     services.AddSingleton<IMerkleTreeService, SecureFileMonitor.Core.Services.MerkleTreeService>();
                     services.AddSingleton<IAiService, SecureFileMonitor.Core.Services.AiService>();
+                    services.AddSingleton<IAiService, SecureFileMonitor.Core.Services.AiService>();
+                    services.AddSingleton<IAnalyticsService, SecureFileMonitor.Core.Services.GoogleAnalyticsService>();
                     services.AddSingleton<IFileScannerService, SecureFileMonitor.Core.Services.FileScannerService>();
 
                     // ViewModels

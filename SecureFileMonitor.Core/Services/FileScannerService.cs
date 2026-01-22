@@ -14,6 +14,7 @@ namespace SecureFileMonitor.Core.Services
     {
         private readonly IDatabaseService _dbService;
         private readonly IMerkleTreeService _merkleService;
+        private readonly IAnalyticsService _analyticsService;
         private readonly ILogger<FileScannerService> _logger;
         
         // Large file hash queue (thread-safe)
@@ -25,10 +26,12 @@ namespace SecureFileMonitor.Core.Services
         public FileScannerService(
             IDatabaseService dbService,
             IMerkleTreeService merkleService, 
+            IAnalyticsService analyticsService,
             ILogger<FileScannerService> logger)
         {
             _dbService = dbService;
             _merkleService = merkleService;
+            _analyticsService = analyticsService;
             _logger = logger;
         }
         
@@ -78,6 +81,16 @@ namespace SecureFileMonitor.Core.Services
                 {
                     progress?.Report(("Checking for deleted files...", null, null));
                     await CheckForDeletedFilesAsync(driveLetter, foundFiles, ignoreRules);
+                }
+
+                // Analytics
+                if (!cancellationToken.IsCancellationRequested)
+                {
+                    await _analyticsService.LogEventAsync("smart_scan_completed", new System.Collections.Generic.Dictionary<string, object>
+                    {
+                        { "total_files_scanned", foundFiles.Count },
+                        { "drive", driveLetter }
+                    });
                 }
             });
         }
