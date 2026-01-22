@@ -1,60 +1,88 @@
-# 🛡️ Secure File Monitor
+# 🛡️ SecureFileMonitor
+### The Ultimate Local-First Forensic Integrity System
 
-Secure File Monitor is a state-of-the-art Windows application designed for high-security environments. It provides real-time oversight of file system integrity, leveraging local AI for deep content analysis without compromising privacy.
+![Secure File Monitor](./assets/main_ui.png)
 
-![Secure File Monitor UI](./assets/main_ui.png)
+**SecureFileMonitor** is a next-generation file system observability platform designed for security-conscious users, malware analysts, and privacy advocates. Unlike standard file watchers, it combines **Kernel-level Event Tracing**, **Forensic Integrity Verification**, and **Local AI Analysis** into a single, cohesive dashboard.
 
-## 🌟 Core Features
-
-### 🔍 Semantic Content Search
-Don't just search for filenames; search for **meanings**. Our integrated BERT-based embedding engine allows you to find files based on their actual content.
-- *Example:* Searching for "suspicious network logs" will find relevant files even if they are named "Untitled_1.txt".
-
-### 🎙️ AI Transcription & Vision
-- **Whisper OCR**: High-fidelity transcription of audio and video files. Supports GPU acceleration (CUDA) for blazing-fast local processing.
-- **Video Description (VLM)**: Visual Language Models describe the contents of video files, making visual data searchable.
-- **Privacy First**: All AI processing is 100% local. No data ever leaves your machine.
-
-### 🚄 Live System Activity
-Monitors your file system at the kernel level using ETW (Event Tracing for Windows).
-- **Process Tracking**: See exactly which background process (e.g., `cmd.exe`, `powershell.exe`) is creating, modifying, or deleting your files.
-- **Smart Filtering**: Automatically hides noisy system updates while highlighting critical user changes.
-- **True Create Logic**: Distinguishes between opening a file and actually creating one.
-
-### 🛡️ Forensic Integrity Monitoring
-- **Smart Integrity Scanning**: Detects files created, deleted, or modified while the application was offline.
-- **Merkle Tree Granular Diffing**: Identifies exactly which blocks of a file were modified (4MB block granularity), enabling forensic analysis of tampered data.
-- **Persistent Forensic Logs**: All offline changes are logged to an encrypted database with a strong audit trail that survives application restarts.
-- **Background Hashing**: Efficiently processes large files (>50MB) in the background so your UI remains smooth using SHA256.
+> **Privacy Guarantee**: All AI processing (OCR, Transcription, Vector Embeddings) is performed 100% locally on your device. No data is ever sent to the cloud.
 
 ---
 
-## 🚀 Getting Started
+## 🚀 Key Capabilities
+
+### 1. 🕵️ Forensic Integrity Monitoring (New!)
+Track the "Deep State" of your file system. SecureFileMonitor detects changes that happen even when the application is closed.
+*   **Smart "Deep" Scanning**: Automatically detects **New**, **Deleted**, and **Modified** files across the entire drive during startup.
+*   **Merkle Tree Granular Diffing**: Don't just know *that* a file changed; know *where* it changed. The system maintains a Merkle Tree for every file, allowing you to see exactly which 4MB blocks were tampered with.
+*   **Persistent Offline History**: A dedicated, encrypted audit log tracks every offline change, ensuring you never miss a beat—even after a system reboot.
+
+### 2. 🧠 Local AI Intelligence
+Turn your file system into a searchable knowledge base without sacrificing privacy.
+*   **Semantic Search**: Find files by *meaning*, not just name. (e.g., search "invoice from last week" to find `inv_2023.pdf`).
+*   **Whisper AI Transcription**: Automatically transcribes audio and video files using OpenAI's Whisper model (running locally via GPU/CPU).
+*   **Visual Description (VLM)**: automatically generates textual descriptions for images and video frames, making visual content searchable.
+
+### 3. ⚡ Real-Time Kernel Monitoring
+*   **ETW Powered**: Hooks directly into Event Tracing for Windows to capture file events as they happen in the kernel.
+*   **Process Attribution**: See exactly *which process* (PID/Name) touched your files. Was it `Explorer.exe` or `TotallyNotMalware.exe`?
+*   **Smart Filtering**: Advanced noise reduction filters out benign system activity so you can focus on user-impacting events.
+
+### 4. 🔒 Enterprise-Grade Security
+*   **Encrypted Storage**: All metadata, forensic logs, and vector embeddings are stored in a SQLCipher-encrypted SQLite database.
+*   **SHA256 Standardization**: All file integrity checks use industry-standard SHA256 hashing.
+
+---
+
+## 📦 Installation
 
 ### Prerequisites
-- **Windows 10/11** (Admin privileges required for ETW monitoring)
-- **NVIDIA GPU** (Optional, recommended for Whisper CUDA acceleration)
-- **.NET 10 Runtime**
+*   **OS**: Windows 10 or Windows 11 (x64)
+*   **Runtime**: .NET 10.0 SDK/Runtime
+*   **Permissions**: Administrator privileges are required for ETW (Kernel Monitoring).
+*   **Hardware**: NVIDIA GPU recommended (but not required) for accelerated AI tasks.
 
-### Installation
-1. Download the latest release from the [Releases](https://github.com/dparksports/SecureFileMonitor/releases) page.
-2. Extract the archive to a secure directory.
-3. Run `SecureFileMonitor.UI.exe` as Administrator.
-4. On first launch, the app will download necessary AI models (Whisper/BERT) locally.
+### Setup
+1.  **Download**: Grab the latest release from the [Releases Page](../../releases).
+2.  **Unzip**: Extract to a permanent location (e.g., `C:\Tools\SecureFileMonitor`).
+3.  **Run**: Execute `SecureFileMonitor.UI.exe` **as Administrator**.
+4.  **Initialize**: On first run, the system will:
+    *   Initialize the encrypted database.
+    *   Download necessary local AI models (Whisper, BERT, etc.).
+
+---
+
+## 🛠️ Usage Guide
+
+### The "Files Changes" Tab
+This is your forensic command center.
+*   **View History**: See a chronological list of all files modified while the monitor was offline.
+*   **Inspect Changes**: Right-click any "Modified" event and select **"🔍 Show Analysis Details"** to view the Block-Level Merkle Diff.
+
+### The "Live Activity" Tab
+Watch your system breathe in real-time.
+*   **Filter**: Use the search bar to filter by Process Name, File Extension, or Event Type.
+*   **Pause/Resume**: Toggle monitoring to investigate specific time windows.
 
 ---
 
-## 🛠️ Technology Stack
-- **C# / WPF**: Native Windows performance and aesthetics.
-- **CommunityToolkit.Mvvm**: Robust architecture.
-- **Whisper.net**: Fast, local audio transcription.
-- **Microsoft.ML.OnnxRuntime**: Efficient local model inference.
-- **SQLite (SQLCipher)**: Encrypted storage for all metadata and history.
-- **TraceEvent**: Real-time kernel event processing.
+## 🏗️ Building from Source
+
+```powershell
+# Clone the repository
+git clone https://github.com/dparksports/SecureFileMonitor.git
+
+# Navigate to directory
+cd SecureFileMonitor
+
+# Build the solution
+dotnet build SecureFileMonitor.slnx -c Release
+```
 
 ---
+
+## 🤝 Contributing
+Contributions are welcome! Please submit a Pull Request or open an Issue for feature requests.
 
 ## 📄 License
-This project is licensed under the **Apache License 2.0**. See the [LICENSE](./LICENSE) file for details.
-
-Developed with ❤️ for secure environments.
+This project is licensed under the **Apache 2.0 License**.
