@@ -143,6 +143,22 @@ namespace SecureFileMonitor.UI.ViewModels
         [ObservableProperty]
         private string _hashETA = "";
 
+        [ObservableProperty]
+        private bool _skipWindows = false;
+
+        async partial void OnSkipWindowsChanged(bool value)
+        {
+             try { await _dbService.SaveSettingAsync("SkipWindows", value.ToString()); } catch { /* Ignore */ }
+        }
+
+        [ObservableProperty]
+        private bool _skipProgramFiles = false;
+
+        async partial void OnSkipProgramFilesChanged(bool value)
+        {
+             try { await _dbService.SaveSettingAsync("SkipProgramFiles", value.ToString()); } catch { /* Ignore */ }
+        }
+
         // Sorting
         [ObservableProperty]
         private string _sortBy = "LastModified"; // Default to LastModified to show actual work first
@@ -446,10 +462,14 @@ namespace SecureFileMonitor.UI.ViewModels
                 string? useThreadsVal = await _dbService.GetSettingAsync("UseThreads");
                 string? verifyVal = await _dbService.GetSettingAsync("VerifyGpuHash");
                 string? isPausedVal = await _dbService.GetSettingAsync("IsPaused");
+                string? skipWindowsVal = await _dbService.GetSettingAsync("SkipWindows");
+                string? skipProgramFilesVal = await _dbService.GetSettingAsync("SkipProgramFiles");
 
                 UseGpu = bool.TryParse(useGpuVal, out bool g) && g;
                 UseThreads = bool.TryParse(useThreadsVal, out bool t) && t;
                 VerifyGpuHash = bool.TryParse(verifyVal, out bool v) && v;
+                SkipWindows = bool.TryParse(skipWindowsVal, out bool sw) && sw;
+                SkipProgramFiles = bool.TryParse(skipProgramFilesVal, out bool sp) && sp;
                 
                 // Restore Pause State
                 if (bool.TryParse(isPausedVal, out bool p) && p)
@@ -462,7 +482,7 @@ namespace SecureFileMonitor.UI.ViewModels
                     });
                 }
 
-                string modeName = isFullScan ? "FULL SCAN" : "SCAN NEW FILES";
+                string modeName = isFullScan ? "SCAN FULL" : "SCAN NEW FILES";
                 
                 // Get Selected Drives
                 if (AvailableDrives.Count == 0) await LoadDrives();
@@ -495,7 +515,7 @@ namespace SecureFileMonitor.UI.ViewModels
                     if (_scanCts.Token.IsCancellationRequested || IsPaused) break;
 
                     StatusMessage = $"{modeName}: Scanning {drive.Name}...";
-                    await _scannerService.ScanDriveAsync(drive.Name, ScanReparseFolders, isFullScan, progress, _scanCts.Token);
+                    await _scannerService.ScanDriveAsync(drive.Name, ScanReparseFolders, SkipWindows, SkipProgramFiles, isFullScan, progress, _scanCts.Token);
                 }
 
 

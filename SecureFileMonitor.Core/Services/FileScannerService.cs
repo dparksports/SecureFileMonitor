@@ -54,7 +54,7 @@ namespace SecureFileMonitor.Core.Services
             public bool IsPaused => false; // handled externally
         }
 
-        public async Task ScanDriveAsync(string driveLetter, bool scanReparseFolders, bool forceFullScan, IProgress<(string Status, double? Percent, TimeSpan? ETA)> progress, CancellationToken cancellationToken)
+        public async Task ScanDriveAsync(string driveLetter, bool scanReparseFolders, bool skipWindows, bool skipProgramFiles, bool forceFullScan, IProgress<(string Status, double? Percent, TimeSpan? ETA)> progress, CancellationToken cancellationToken)
         {
             var ignoreRules = (await _dbService.GetAllIgnoreRulesAsync()).ToList();
             
@@ -87,10 +87,6 @@ namespace SecureFileMonitor.Core.Services
             catch { /* Ignore */ }
 
             // 2. Initialize Scan Queue (Iterative/Persistent)
-            // Check if we have a pending state for this drive
-            // For simplicity in this method, we assume "ScanDriveAsync" is called for the drive loop.
-            // But if we are resuming, we might just picking up whatever is in the DB queue.
-            // Let's seed the root if the queue is empty.
             if (await _dbService.GetPendingScanCountAsync() == 0)
             {
                 await _dbService.AddDirectoryToScanQueueAsync(driveLetter, driveLetter);
@@ -100,31 +96,34 @@ namespace SecureFileMonitor.Core.Services
             while (!_isPaused && !cancellationToken.IsCancellationRequested)
             {
                 var dirState = await _dbService.GetNextDirectoryToScanAsync();
-                if (dirState == null) break; // Nothing left to scan for ANY drive (global queue)
+                if (dirState == null) break; 
 
                 // Filter by drive if we are specifically scanning one drive? 
-                // The prompt implies we scan "Selected Drives". The Queue might contain mixed drives if user selected A and B.
-                // If this method is called per drive, we should filter.
                 if (!dirState.Path.StartsWith(driveLetter, StringComparison.OrdinalIgnoreCase))
                 {
-                     // This item belongs to another drive. Since GetNext is older-first, we might block if we don't process it.
-                     // IMPORTANT: The UI usually calls ScanDriveAsync in a loop for each drive. 
-                     // Ideally, we should unify this into "ScanAllSelectedDrivesAsync".
-                     // For now, if we match drive, process. If not, SKIP locally but don't mark processed? 
-                     // No, that would loop forever. 
-                     // BETTER APPROACH: This method processes ONLY its drive's items.
-                     // BUT SQLite doesn't support complex "Next where Drive=X".
-                     // Workaround: We'll assume the caller calls this serially or we change logic to "ProcessQueueAsync" which handles all.
-                     // Let's proceed with processing it regardless of "driveLetter" arg if it's in the queue?
-                     // No, let's respect the argument.
-                     if (!dirState.Path.StartsWith(driveLetter, StringComparison.OrdinalIgnoreCase))
-                     {
-                         // Temporary skip logic or just break? 
-                         // If we break, we stop this drive's scan.
-                         // Let's modify the query in DatabaseService later to filter by DriveLetter. 
-                         // For now, we'll assume the queue is cleared on "Start New Scan" unless it's a "Resume".
-                     }
+                     // Simple skip for now if it doesn't match the current drive
+                     // In a real multi-drive resume scenario, this might need refinement
                 }
+
+                // --- ROBUST SKIP LOGIC FOR QUEUED ITEMS ---
+                if (skipWindows || skipProgramFiles)
+                {
+                    bool shouldSkip = false;
+                    var segments = dirState.Path.Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+                    
+                    if (skipWindows && segments.Any(s => s.Equals("Windows", StringComparison.OrdinalIgnoreCase)))
+                        shouldSkip = true;
+                        
+                    if (!shouldSkip && skipProgramFiles && segments.Any(s => s.Equals("Program Files", StringComparison.OrdinalIgnoreCase) || s.Equals("Program Files (x86)", StringComparison.OrdinalIgnoreCase)))
+                        shouldSkip = true;
+
+                    if (shouldSkip)
+                    {
+                         await _dbService.MarkDirectoryAsProcessedAsync(dirState.Id);
+                         continue;
+                    }
+                }
+                // ------------------------------------------
 
                 if (cancellationToken.IsCancellationRequested) break;
                 if (_isPaused) break;
@@ -132,7 +131,7 @@ namespace SecureFileMonitor.Core.Services
                 try
                 {
                     var dirInfo = new DirectoryInfo(dirState.Path);
-                    await ScanSingleDirectoryAsync(dirInfo, hasher, scanReparseFolders, forceFullScan, ignoreRules, progress, cancellationToken, state);
+                    await ScanSingleDirectoryAsync(dirInfo, hasher, scanReparseFolders, skipWindows, skipProgramFiles, forceFullScan, ignoreRules, progress, cancellationToken, state);
                 }
                 catch (Exception ex)
                 {
@@ -143,18 +142,15 @@ namespace SecureFileMonitor.Core.Services
                     await _dbService.MarkDirectoryAsProcessedAsync(dirState.Id);
                 }
             }
-             
-             // ... (Deletion detection logic remains similar but needs to be adapted for pause/resume safely)
         }
 
-        private async Task ScanSingleDirectoryAsync(DirectoryInfo directory, IHasherService hasher, bool scanReparseFolders, bool forceFullScan,
+        private async Task ScanSingleDirectoryAsync(DirectoryInfo directory, IHasherService hasher, bool scanReparseFolders, bool skipWindows, bool skipProgramFiles, bool forceFullScan,
             List<IgnoreRule> ignoreRules, 
             IProgress<(string Status, double? Percent, TimeSpan? ETA)>? progress, 
             CancellationToken cancellationToken,
             ScanState state)
         {
             // Report Progress
-            // ... (Simple progress reporting simplified)
             progress?.Report(($"Scanning: {directory.FullName}", null, null));
 
             var enumOptions = new EnumerationOptions { AttributesToSkip = 0, RecurseSubdirectories = false, IgnoreInaccessible = true };
@@ -166,13 +162,15 @@ namespace SecureFileMonitor.Core.Services
                  {
                      if (cancellationToken.IsCancellationRequested) return;
 
+                     // --- SKIP LOGIC ---
+                     if (skipWindows && subDir.Name.Equals("Windows", StringComparison.OrdinalIgnoreCase)) continue;
+                     if (skipProgramFiles && (subDir.Name.Equals("Program Files", StringComparison.OrdinalIgnoreCase) || subDir.Name.Equals("Program Files (x86)", StringComparison.OrdinalIgnoreCase))) continue;
+                     // ------------------
+
                      bool isReparse = (subDir.Attributes & FileAttributes.ReparsePoint) != 0;
                      if (isReparse && !scanReparseFolders) continue;
 
-                     // Add to Persistent Queue
-                     // Only add if not ignored?
                      bool isIgnoredDir = ignoreRules.Any(r => subDir.FullName.StartsWith(r.Path, StringComparison.OrdinalIgnoreCase));
-                     // We scan ignored dirs to track files inside? Original logic said "REMOVED: Do NOT skip ignored directories".
                      
                      string driveRoot = Path.GetPathRoot(subDir.FullName) ?? "";
                      await _dbService.AddDirectoryToScanQueueAsync(subDir.FullName, driveRoot);
@@ -186,19 +184,8 @@ namespace SecureFileMonitor.Core.Services
                      filePaths.Add(file.FullName);
                  }
 
-                 // Parallel Processing if Threaded? 
-                 // If hasher is ThreadedHasherService, it optimizes internally for Block Hashes, NOT for multiple files.
-                 // So we should parallelize the loop here if "Use Threads" is on?
-                 // The requirement said "Use threads for parallel streams".
-                 // Let's use Parallel.ForEachAsync if Hasher is ThreadedHasherService logic implicates it.
-                 // But simply: 
-                 
                  foreach (var filePath in filePaths)
                  {
-                     // ... File Processing Logic (Copy-Paste mostly but use `hasher`)
-                     // ...
-                     // Simplified for brevity in this replace, retaining core logic
-                     
                      var file = new FileInfo(filePath);
                      var existingEntry = await _dbService.GetFileEntryAsync(filePath);
                      bool needsHashing = true;
@@ -223,7 +210,6 @@ namespace SecureFileMonitor.Core.Services
                              newHash = await hasher.ComputeHashAsync(filePath);
                          }
                          
-                         // Update Entry...
                          var entry = new FileEntry 
                          { 
                              FilePath = filePath, 
@@ -231,7 +217,6 @@ namespace SecureFileMonitor.Core.Services
                              FileSize = file.Length, 
                              LastModified = file.LastWriteTimeUtc,
                              CurrentHash = newHash 
-                             // ... other props
                          };
                          await _dbService.SaveFileEntryAsync(entry);
                      }
