@@ -42,4 +42,7 @@ Built with a focus on performance and security, it features a modern, dark-theme
 *   **Runtime**: .NET 10.0 (included in release or installed separately)
 
 ## License
-MIT License
+apache license
+
+---
+_made with ❤️ in california_
