@@ -25,41 +25,6 @@ namespace SecureFileMonitor.Core.Services
 
         private bool DetectCuda()
         {
-             // Check common locations for CUDA-enabled libraries
-             string baseDir = AppDomain.CurrentDomain.BaseDirectory;
-             
-             // 1. Check for OnnxRuntime GPU provider
-             string[] onnxCudaPaths = 
-             {
-                 Path.Combine(baseDir, "onnxruntime_providers_cuda.dll"),
-                 Path.Combine(baseDir, "runtimes", "win-x64", "native", "onnxruntime_providers_cuda.dll")
-             };
-             
-             bool foundOnnx = onnxCudaPaths.Any(File.Exists);
-
-             // 2. Check for Whisper CUDA
-             string[] whisperCudaPaths =
-             {
-                 Path.Combine(baseDir, "ggml-cuda-whisper.dll"),
-                 Path.Combine(baseDir, "runtimes", "cuda", "win-x64", "ggml-cuda-whisper.dll"),
-                 Path.Combine(baseDir, "runtimes", "win-x64", "native", "ggml-cuda-whisper.dll")
-             };
-
-             bool foundWhisper = whisperCudaPaths.Any(File.Exists);
-
-             if (foundOnnx || foundWhisper) return true;
-
-             // 3. Fallback: Check System Path for CUDA Runtime (heuristic)
-             try
-             {
-                var cudaLibs = new[] { "cudart64_12.dll", "cudart64_110.dll", "cublas64_12.dll", "cublas64_11.dll" };
-                foreach (var lib in cudaLibs)
-                {
-                    if (File.Exists(Path.Combine(baseDir, lib))) return true;
-                }
-             }
-             catch {}
-
              return false;
         }
 

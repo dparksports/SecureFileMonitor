@@ -24,13 +24,35 @@ namespace SecureFileMonitor.UI.Converters
         public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
         {
             if (value == null || parameter == null) return System.Windows.Media.Brushes.Transparent;
-            // Highlight color if active: #1E88E5 blue
+            // Highlight color if active: #00E5FF Cyan
             if (value.ToString() == parameter.ToString())
             {
-                var brush = new System.Windows.Media.BrushConverter().ConvertFrom("#1E88E5") as System.Windows.Media.Brush;
+                var brush = new System.Windows.Media.BrushConverter().ConvertFrom("#00E5FF") as System.Windows.Media.Brush;
                 return brush ?? System.Windows.Media.Brushes.Transparent;
             }
             return System.Windows.Media.Brushes.Transparent;
+        }
+
+        public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            throw new NotImplementedException();
+        }
+    }
+
+    public class ViewToForegroundConverter : IValueConverter
+    {
+        public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+        {
+            if (value == null || parameter == null) return System.Windows.Media.Brushes.Gray;
+            
+            if (value.ToString() == parameter.ToString())
+            {
+                // Active: Cyan
+                var brush = new System.Windows.Media.BrushConverter().ConvertFrom("#00E5FF") as System.Windows.Media.Brush;
+                return brush ?? System.Windows.Media.Brushes.White;
+            }
+            // Inactive: Gray
+            return System.Windows.Media.Brushes.Gray;
         }
 
         public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)

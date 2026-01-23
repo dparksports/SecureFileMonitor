@@ -126,6 +126,13 @@ namespace SecureFileMonitor.UI.ViewModels
         [ObservableProperty]
         private string _lastScannedTime = "Never";
 
+        partial void OnLastScannedTimeChanged(string value)
+        {
+            OnPropertyChanged(nameof(IsDuplicateScanAvailable));
+        }
+
+        public bool IsDuplicateScanAvailable => LastScannedTime != "Never";
+
         [ObservableProperty]
         private string _scanETA = "";
 

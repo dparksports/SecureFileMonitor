@@ -83,47 +83,139 @@
         <!-- Main Content -->
         <Grid Grid.Row="0" Margin="20,15">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="250"/>
+                <ColumnDefinition Width="90"/>
                 <ColumnDefinition Width="*"/>
             </Grid.ColumnDefinitions>
 
             <!-- Sidebar -->
-            <StackPanel Grid.Column="0" Margin="0,0,20,0">
+            <Grid Grid.Column="0" Margin="0,0,10,0" Background="{StaticResource NavyBackgroundBrush}">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <Grid.Resources>
+                    <Style x:Key="SidebarButtonStyle" TargetType="Button">
+                        <Setter Property="Background" Value="Transparent"/>
+                        <Setter Property="BorderThickness" Value="3,0,0,0"/>
+                        <Setter Property="Height" Value="75"/>
+                        <Setter Property="Margin" Value="0,0,0,5"/>
+                        <Setter Property="Cursor" Value="Hand"/>
+                        <Setter Property="Template">
+                            <Setter.Value>
+                                <ControlTemplate TargetType="Button">
+                                    <Border Background="{TemplateBinding Background}" 
+                                            BorderBrush="{TemplateBinding BorderBrush}" 
+                                            BorderThickness="{TemplateBinding BorderThickness}">
+                                        <Grid>
+                                             <!-- Active Indicator Glow (Optional) -->
+                                            <Border Background="{TemplateBinding BorderBrush}" Opacity="0.1" HorizontalAlignment="Stretch" VerticalAlignment="Stretch"/>
+                                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                        </Grid>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                             <Setter Property="Background" Value="#11FFFFFF"/>
+                                        </Trigger>
+                                        <Trigger Property="IsEnabled" Value="False">
+                                            <Setter Property="Opacity" Value="0.3"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Setter.Value>
+                        </Setter>
+                    </Style>
+                </Grid.Resources>
+
                 <!-- Branding -->
-                <StackPanel Margin="0,0,0,20">
-                    <StackPanel Orientation="Horizontal" Margin="0,0,0,5">
-                        <TextBlock Text="&#xE8B9;" FontFamily="Segoe MDL2 Assets" FontSize="20" Foreground="SpringGreen" Margin="0,0,8,0"/>
-                        <TextBlock Text="SECURE FILE MONITOR" FontSize="16" FontWeight="Bold" Foreground="White" VerticalAlignment="Center"/>
-                    </StackPanel>
-                    <Border Background="#33FF0000" CornerRadius="4" HorizontalAlignment="Left" Padding="8,2">
-                        <TextBlock Text="HIGH SECURITY MODE" Foreground="Red" FontWeight="SemiBold" FontSize="10"/>
-                    </Border>
+                <StackPanel Grid.Row="0" Margin="0,20,0,30" HorizontalAlignment="Center">
+                     <TextBlock Text="&#xE771;" FontFamily="Segoe MDL2 Assets" FontSize="24" Foreground="{StaticResource CyanAccentBrush}" HorizontalAlignment="Center" Margin="0,0,0,8"/>
+                     <TextBlock Text="SECURE" FontSize="10" FontWeight="Bold" Foreground="{StaticResource CyanAccentBrush}" HorizontalAlignment="Center"/>
+                     <TextBlock Text="FILES" FontSize="10" FontWeight="Bold" Foreground="{StaticResource CyanAccentBrush}" HorizontalAlignment="Center"/>
                 </StackPanel>
 
                 <!-- Navigation -->
-                <TextBlock Text="NAVIGATION" FontWeight="Bold" Foreground="Gray" Margin="0,10,0,5" FontSize="10"/>
-                <Button Command="{Binding SwitchViewCommand}" CommandParameter="VAULT" Content="📁 VAULT" 
-                        Background="{Binding CurrentViewName, Converter={StaticResource ViewToColorConverter}, ConverterParameter=VAULT}" 
-                        Foreground="White" Padding="10" Margin="0,2,0,0" HorizontalContentAlignment="Left" BorderThickness="0"/>
-                <Button Command="{Binding SwitchViewCommand}" CommandParameter="LIVE" Content="⚡ LIVE ACTIVITY" 
-                        Background="{Binding CurrentViewName, Converter={StaticResource ViewToColorConverter}, ConverterParameter=LIVE}" 
-                        Foreground="White" Padding="10" Margin="0,2,0,0" HorizontalContentAlignment="Left" BorderThickness="0"/>
-                <Button Command="{Binding SwitchViewCommand}" CommandParameter="DUPLICATES" Content="👯 DUPLICATES" 
-                        Background="{Binding CurrentViewName, Converter={StaticResource ViewToColorConverter}, ConverterParameter=DUPLICATES}" 
-                        Foreground="White" Padding="10" Margin="0,2,0,0" HorizontalContentAlignment="Left" BorderThickness="0"/>
-                <Button Command="{Binding SwitchViewCommand}" CommandParameter="FILES_CHANGES" Content="🕒 FILES CHANGES" 
-                        Background="{Binding CurrentViewName, Converter={StaticResource ViewToColorConverter}, ConverterParameter=FILES_CHANGES}" 
-                        Foreground="White" Padding="10" Margin="0,2,0,0" HorizontalContentAlignment="Left" BorderThickness="0"/>
+                <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Hidden">
+                    <StackPanel>
+                        <!-- Dashboard / Vault -->
+                        <Button Command="{Binding SwitchViewCommand}" CommandParameter="VAULT"
+                                Style="{StaticResource SidebarButtonStyle}"
+                                BorderBrush="{Binding CurrentViewName, Converter={StaticResource ViewToColorConverter}, ConverterParameter=VAULT}"
+                                Foreground="{Binding CurrentViewName, Converter={StaticResource ViewToForegroundConverter}, ConverterParameter=VAULT}">
+                            <StackPanel>
+                                <TextBlock Text="&#xE80F;" FontFamily="Segoe MDL2 Assets" FontSize="20" HorizontalAlignment="Center" Margin="0,0,0,5"/>
+                                <TextBlock Text="VAULT" FontSize="9" FontWeight="SemiBold" HorizontalAlignment="Center"/>
+                            </StackPanel>
+                        </Button>
 
+                        <!-- Security / Live -->
+                        <Button Command="{Binding SwitchViewCommand}" CommandParameter="LIVE"
+                                Style="{StaticResource SidebarButtonStyle}"
+                                BorderBrush="{Binding CurrentViewName, Converter={StaticResource ViewToColorConverter}, ConverterParameter=LIVE}"
+                                Foreground="{Binding CurrentViewName, Converter={StaticResource ViewToForegroundConverter}, ConverterParameter=LIVE}">
+                            <StackPanel>
+                                <TextBlock Text="&#xE72E;" FontFamily="Segoe MDL2 Assets" FontSize="20" HorizontalAlignment="Center" Margin="0,0,0,5"/>
+                                <TextBlock Text="MONITOR LIVE" FontSize="9" FontWeight="SemiBold" HorizontalAlignment="Center"/>
+                            </StackPanel>
+                        </Button>
 
-                <Button Command="{Binding SwitchViewCommand}" CommandParameter="IGNORE_LIST" Content="🚫 IGNORE LIST" 
-                        Background="{Binding CurrentViewName, Converter={StaticResource ViewToColorConverter}, ConverterParameter=IGNORE_LIST}" 
-                        Foreground="White" Padding="10" Margin="0,2,0,0" HorizontalContentAlignment="Left" BorderThickness="0"/>
-                        
-                <Button Command="{Binding SwitchViewCommand}" CommandParameter="SETTINGS" Content="⚙️ SETTINGS" 
-                        Background="{Binding CurrentViewName, Converter={StaticResource ViewToColorConverter}, ConverterParameter=SETTINGS}" 
-                        Foreground="White" Padding="10" Margin="0,2,0,0" HorizontalContentAlignment="Left" BorderThickness="0"/>
-            </StackPanel>
+                        <!-- Diagnostics / File Changes -->
+                        <Button Command="{Binding SwitchViewCommand}" CommandParameter="FILES_CHANGES"
+                                Style="{StaticResource SidebarButtonStyle}"
+                                BorderBrush="{Binding CurrentViewName, Converter={StaticResource ViewToColorConverter}, ConverterParameter=FILES_CHANGES}"
+                                Foreground="{Binding CurrentViewName, Converter={StaticResource ViewToForegroundConverter}, ConverterParameter=FILES_CHANGES}">
+                            <StackPanel>
+                                <TextBlock Text="&#xE9D2;" FontFamily="Segoe MDL2 Assets" FontSize="20" HorizontalAlignment="Center" Margin="0,0,0,5"/>
+                                <TextBlock Text="CHANGES" FontSize="9" FontWeight="SemiBold" HorizontalAlignment="Center"/>
+                            </StackPanel>
+                        </Button>
+
+                        <!-- Duplicates -->
+                        <Button Command="{Binding SwitchViewCommand}" CommandParameter="DUPLICATES"
+                                IsEnabled="{Binding IsDuplicateScanAvailable}" 
+                                ToolTip="Run a Full Scan to enable duplicate detection"
+                                ToolTipService.ShowOnDisabled="True"
+                                Style="{StaticResource SidebarButtonStyle}"
+                                BorderBrush="{Binding CurrentViewName, Converter={StaticResource ViewToColorConverter}, ConverterParameter=DUPLICATES}"
+                                Foreground="{Binding CurrentViewName, Converter={StaticResource ViewToForegroundConverter}, ConverterParameter=DUPLICATES}">
+                            <StackPanel>
+                                <TextBlock Text="&#xE11D;" FontFamily="Segoe MDL2 Assets" FontSize="20" HorizontalAlignment="Center" Margin="0,0,0,5"/>
+                                <TextBlock Text="DUPLICATES" FontSize="9" FontWeight="SemiBold" HorizontalAlignment="Center"/>
+                            </StackPanel>
+                        </Button>
+                    </StackPanel>
+                </ScrollViewer>
+
+                <!-- Footer Navigation -->
+                <StackPanel Grid.Row="2" Margin="0,10,0,20">
+                    <Border Height="1" Background="#333" Margin="10,0,10,15"/>
+                    
+                     <!-- Inspect / Ignore -->
+                    <Button Command="{Binding SwitchViewCommand}" CommandParameter="IGNORE_LIST"
+                            Style="{StaticResource SidebarButtonStyle}"
+                            Height="65"
+                            BorderBrush="{Binding CurrentViewName, Converter={StaticResource ViewToColorConverter}, ConverterParameter=IGNORE_LIST}"
+                            Foreground="{Binding CurrentViewName, Converter={StaticResource ViewToForegroundConverter}, ConverterParameter=IGNORE_LIST}">
+                        <StackPanel>
+                            <TextBlock Text="&#xE7B3;" FontFamily="Segoe MDL2 Assets" FontSize="18" HorizontalAlignment="Center" Margin="0,0,0,5"/>
+                            <TextBlock Text="IGNORE LIST" FontSize="9" FontWeight="SemiBold" HorizontalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
+
+                    <!-- Settings -->
+                    <Button Command="{Binding SwitchViewCommand}" CommandParameter="SETTINGS"
+                            Style="{StaticResource SidebarButtonStyle}"
+                            Height="65"
+                            BorderBrush="{Binding CurrentViewName, Converter={StaticResource ViewToColorConverter}, ConverterParameter=SETTINGS}"
+                            Foreground="{Binding CurrentViewName, Converter={StaticResource ViewToForegroundConverter}, ConverterParameter=SETTINGS}">
+                        <StackPanel>
+                            <TextBlock Text="&#xE713;" FontFamily="Segoe MDL2 Assets" FontSize="18" HorizontalAlignment="Center" Margin="0,0,0,5"/>
+                            <TextBlock Text="SETTINGS" FontSize="9" FontWeight="SemiBold" HorizontalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
+                </StackPanel>
+            </Grid>
 
             <!-- Main Content Area -->
             <Border Grid.Column="1" Background="#11FFFFFF" CornerRadius="8" Padding="10">

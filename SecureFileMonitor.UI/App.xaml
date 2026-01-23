@@ -5,6 +5,9 @@
 
     <Application.Resources>
          <converters:InverseBooleanConverter x:Key="InverseBooleanConverter"/>
+         <converters:ViewToColorConverter x:Key="ViewToColorConverter"/>
+         <converters:ViewToForegroundConverter x:Key="ViewToForegroundConverter"/>
+         <converters:BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter"/>
          
          <!-- Cyberpunk Theme Resources -->
          <Color x:Key="CyberpunkGreenColor">#00FF7F</Color>
@@ -21,5 +24,12 @@
 
          <Color x:Key="TextSecondaryColor">#AAAAAA</Color>
          <SolidColorBrush x:Key="TextSecondaryBrush" Color="{StaticResource TextSecondaryColor}"/>
+
+         <!-- Auto Command Theme -->
+         <Color x:Key="NavyBackgroundColor">#0F172A</Color>
+         <SolidColorBrush x:Key="NavyBackgroundBrush" Color="{StaticResource NavyBackgroundColor}"/>
+         <Color x:Key="CyanAccentColor">#00E5FF</Color>
+         <SolidColorBrush x:Key="CyanAccentBrush" Color="{StaticResource CyanAccentColor}"/>
+         <SolidColorBrush x:Key="SidebarHoverBrush" Color="#1E293B"/>
     </Application.Resources>
 </Application>
