@@ -231,9 +231,9 @@
                                             <StackPanel Orientation="Horizontal" Margin="0,0,0,5">
                                                  <CheckBox IsChecked="{Binding UseGpu}" 
                                                            Content="{Binding GpuCheckboxContent}" 
-                                                           IsEnabled="{Binding IsGpuSelectionEnabled}"
-                                                           Foreground="White" Margin="0,0,15,0"
-                                                           ToolTip="Uses ComputeSharp to offload hashing to GPU"/>
+                                                           IsEnabled="False"
+                                                           Foreground="Gray" Margin="0,0,15,0"
+                                                           ToolTip="GPU acceleration temporarily disabled in v1.3.4 optimization"/>
                                                  <CheckBox IsChecked="{Binding UseThreads}" Content="Use Multi-threading" Foreground="White" Margin="0,0,15,0"/>
                                             </StackPanel>
                                             <CheckBox IsChecked="{Binding VerifyGpuHash}" Content="Verify GPU Hashing (Slows performance, ensures accuracy)" 

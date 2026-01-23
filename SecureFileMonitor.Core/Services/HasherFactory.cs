@@ -22,7 +22,14 @@ namespace SecureFileMonitor.Core.Services
             {
                 if (OperatingSystem.IsWindowsVersionAtLeast(6, 2))
                 {
-                    primary = new GpuHasherService(_gpuLogger);
+                    try 
+                    {
+                        primary = new GpuHasherService(_gpuLogger); 
+                    }
+                    catch 
+                    { 
+                        primary = new CpuHasherService(); 
+                    }
                 }
                 else
                 {

@@ -168,7 +168,8 @@ namespace SecureFileMonitor.UI.ViewModels
         }
 
         // Settings & About
-        public string AppVersion => "v1.3.3";
+        // Settings & About
+        public string AppVersion => "v1.3.4";
 
         [ObservableProperty]
         private bool _isAnalyticsEnabled = true;
