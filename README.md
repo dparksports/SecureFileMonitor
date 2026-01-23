@@ -1,6 +1,6 @@
 # Secure Files
 
-![Secure Files Preview](assets/app_preview.png)
+![Secure Files Preview](assets/app_preview.png?v=2)
 
 ## Overview
 
