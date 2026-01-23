@@ -41,4 +41,4 @@ dotnet build -c Release
 ```
 
 ---
-Made with a ❤️ in California.
+Made with ❤️ in California.
