@@ -25,22 +25,42 @@ namespace SecureFileMonitor.Core.Services
 
         private bool DetectCuda()
         {
-            try
-            {
-                // Check for common CUDA runtime libraries in the application directory or system path
-                // This is a heuristic, better than always returning false
+             // Check common locations for CUDA-enabled libraries
+             string baseDir = AppDomain.CurrentDomain.BaseDirectory;
+             
+             // 1. Check for OnnxRuntime GPU provider
+             string[] onnxCudaPaths = 
+             {
+                 Path.Combine(baseDir, "onnxruntime_providers_cuda.dll"),
+                 Path.Combine(baseDir, "runtimes", "win-x64", "native", "onnxruntime_providers_cuda.dll")
+             };
+             
+             bool foundOnnx = onnxCudaPaths.Any(File.Exists);
+
+             // 2. Check for Whisper CUDA
+             string[] whisperCudaPaths =
+             {
+                 Path.Combine(baseDir, "ggml-cuda-whisper.dll"),
+                 Path.Combine(baseDir, "runtimes", "cuda", "win-x64", "ggml-cuda-whisper.dll"),
+                 Path.Combine(baseDir, "runtimes", "win-x64", "native", "ggml-cuda-whisper.dll")
+             };
+
+             bool foundWhisper = whisperCudaPaths.Any(File.Exists);
+
+             if (foundOnnx || foundWhisper) return true;
+
+             // 3. Fallback: Check System Path for CUDA Runtime (heuristic)
+             try
+             {
                 var cudaLibs = new[] { "cudart64_12.dll", "cudart64_110.dll", "cublas64_12.dll", "cublas64_11.dll" };
                 foreach (var lib in cudaLibs)
                 {
-                    // Check app local first
-                    if (File.Exists(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, lib))) return true;
+                    if (File.Exists(Path.Combine(baseDir, lib))) return true;
                 }
-                
-                // If we can't find files, maybe try to check if we can initialize a small builder?
-                // But that might be too slow. Let's stick with file check for now.
-                return false;
-            }
-            catch { return false; }
+             }
+             catch {}
+
+             return false;
         }
 
         public async Task<bool> IsModelAvailableAsync()

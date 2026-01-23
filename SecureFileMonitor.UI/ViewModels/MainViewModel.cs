@@ -35,6 +35,40 @@ namespace SecureFileMonitor.UI.ViewModels
         private FileEntry? _selectedFile;
 
         [ObservableProperty]
+        private string _selectedFileTags = string.Empty;
+
+        [ObservableProperty]
+        private string _selectedFileTranscript = string.Empty;
+
+        async partial void OnSelectedFileChanged(FileEntry? value)
+        {
+             if (value != null)
+             {
+                 try
+                 {
+                     var meta = await _dbService.GetMetadataAsync(value.FileId.ToString());
+                     if (meta != null)
+                     {
+                         await System.Windows.Application.Current.Dispatcher.InvokeAsync(() =>
+                         {
+                             SelectedFileTags = meta.Tags ?? "";
+                             SelectedFileTranscript = meta.Transcription ?? "";
+                         });
+                     }
+                     else
+                     {
+                         await System.Windows.Application.Current.Dispatcher.InvokeAsync(() =>
+                         {
+                             SelectedFileTags = "";
+                             SelectedFileTranscript = "";
+                         });
+                     }
+                 }
+                 catch { }
+             }
+        }
+
+        [ObservableProperty]
         private DateTime? _transcribedDateFilter;
 
         [ObservableProperty]
@@ -1289,6 +1323,43 @@ namespace SecureFileMonitor.UI.ViewModels
             _etwService.Stop();
             IsMonitoring = false;
             StatusMessage = "Monitoring Stopped";
+        }
+        [RelayCommand]
+        private void SwitchView(string viewName)
+        {
+            CurrentViewName = viewName;
+        }
+
+        [RelayCommand]
+        private async Task DownloadModels()
+        {
+             StatusMessage = "Downloading AI Models...";
+             try 
+             {
+                 await _aiService.DownloadModelsAsync(new Progress<string>(s => StatusMessage = s));
+                 StatusMessage = "Models Ready.";
+             } 
+             catch (Exception ex) 
+             {
+                 StatusMessage = $"Model Download Error: {ex.Message}";
+             }
+        }
+
+        [RelayCommand]
+        private async Task SaveTags()
+        {
+             if (SelectedFile == null) return;
+             try 
+             {
+                 var meta = await _dbService.GetMetadataAsync(SelectedFile.FileId.ToString()) ?? new FileMetadata { FileId = SelectedFile.FileId.ToString() };
+                 meta.Tags = SelectedFileTags;
+                 await _dbService.SaveMetadataAsync(meta);
+                 StatusMessage = "Tags saved.";
+             } 
+             catch (Exception ex) 
+             {
+                 StatusMessage = $"Error saving tags: {ex.Message}";
+             }
         }
     }
 }

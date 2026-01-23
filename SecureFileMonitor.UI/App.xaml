@@ -5,5 +5,21 @@
 
     <Application.Resources>
          <converters:InverseBooleanConverter x:Key="InverseBooleanConverter"/>
+         
+         <!-- Cyberpunk Theme Resources -->
+         <Color x:Key="CyberpunkGreenColor">#00FF7F</Color>
+         <SolidColorBrush x:Key="CyberpunkGreenBrush" Color="{StaticResource CyberpunkGreenColor}"/>
+         
+         <Color x:Key="DarkBackgroundColor">#101010</Color>
+         <SolidColorBrush x:Key="DarkBackgroundBrush" Color="{StaticResource DarkBackgroundColor}"/>
+         
+         <Color x:Key="PanelBackgroundColor">#1E1E1E</Color>
+         <SolidColorBrush x:Key="PanelBackgroundBrush" Color="{StaticResource PanelBackgroundColor}"/>
+         
+         <Color x:Key="TextPrimaryColor">#FFFFFF</Color>
+         <SolidColorBrush x:Key="TextPrimaryBrush" Color="{StaticResource TextPrimaryColor}"/>
+
+         <Color x:Key="TextSecondaryColor">#AAAAAA</Color>
+         <SolidColorBrush x:Key="TextSecondaryBrush" Color="{StaticResource TextSecondaryColor}"/>
     </Application.Resources>
 </Application>
