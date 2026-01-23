@@ -81,5 +81,9 @@ _CR/
 *.db-wal
 
 # Build Artifacts
-publish/
+publish*/
 *.zip
+*.msi
+*.exe
+!SecureFileMonitor.Core/
+!SecureFileMonitor.UI/

@@ -40,6 +40,36 @@
         <Style TargetType="DataGridRow">
             <Setter Property="IsSelected" Value="{Binding IsSelected, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
         </Style>
+
+        <!-- Dark Button Style to fix white text issues -->
+        <Style x:Key="DarkButtonStyle" TargetType="Button">
+            <Setter Property="Background" Value="#333"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="Padding" Value="10,5"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="border" Background="{TemplateBinding Background}" BorderThickness="{TemplateBinding BorderThickness}" BorderBrush="{TemplateBinding BorderBrush}" CornerRadius="3">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="border" Property="Background" Value="#555"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="border" Property="Background" Value="#000"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="border" Property="Background" Value="#222"/>
+                                <Setter Property="Foreground" Value="Gray"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
     </Window.Resources>
 
     <Grid>
@@ -94,6 +124,10 @@
                 <Button Command="{Binding SwitchViewCommand}" CommandParameter="IGNORE_LIST" Content="🚫 IGNORE LIST" 
                         Background="{Binding CurrentViewName, Converter={StaticResource ViewToColorConverter}, ConverterParameter=IGNORE_LIST}" 
                         Foreground="White" Padding="10" Margin="0,2,0,0" HorizontalContentAlignment="Left" BorderThickness="0"/>
+                        
+                <Button Command="{Binding SwitchViewCommand}" CommandParameter="SETTINGS" Content="⚙️ SETTINGS" 
+                        Background="{Binding CurrentViewName, Converter={StaticResource ViewToColorConverter}, ConverterParameter=SETTINGS}" 
+                        Foreground="White" Padding="10" Margin="0,2,0,0" HorizontalContentAlignment="Left" BorderThickness="0"/>
             </StackPanel>
 
             <!-- Main Content Area -->
@@ -113,40 +147,117 @@
                                 <ColumnDefinition Width="Auto"/>
                             </Grid.ColumnDefinitions>
                             
-                            <StackPanel Orientation="Horizontal">
-                                <Button Command="{Binding ScanDriveCommand}" Content="📂 Scan Drive" 
-                                        Background="#333" Foreground="White" Padding="10,5" Margin="0,0,5,0"/>
-                                <Button Command="{Binding StopScanCommand}" Content="⏹️ Stop" 
-                                        Background="#8B0000" Foreground="White" Padding="10,5" Margin="0,0,10,0"/>
-                                <Button Command="{Binding LoadAllFilesCommand}" Content="📋 Refresh List" 
-                                        Background="#333" Foreground="White" Padding="10,5" Margin="0,0,15,0"/>
+                            <StackPanel>
+                                <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+                                    <Button Command="{Binding ScanNewFilesCommand}" Content="📂 Scan New" 
+                                            Style="{StaticResource DarkButtonStyle}" Margin="0,0,5,0"
+                                            IsEnabled="{Binding IsScanning, Converter={StaticResource InverseBooleanConverter}}"/>
+                                    
+                                    <Button Command="{Binding FullScanCommand}" Content="🔎 Full Scan" 
+                                            Style="{StaticResource DarkButtonStyle}" Margin="0,0,5,0"
+                                            IsEnabled="{Binding IsScanning, Converter={StaticResource InverseBooleanConverter}}"/>
+                                    
+                                    <!-- Scan Control Buttons -->
+                                    <StackPanel Orientation="Horizontal" Visibility="{Binding IsScanning, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                        <Button Command="{Binding PauseScanCommand}" Content="⏸️ Pause" 
+                                                Background="Orange" Foreground="Black" Padding="10,5" Margin="0,0,5,0"
+                                                Visibility="{Binding IsPaused, Converter={StaticResource BooleanToVisibilityConverter}, ConverterParameter=INVERSE}"/>
+                                                
+                                        <Button Command="{Binding ResumeScanCommand}" Content="▶️ Resume" 
+                                                Background="SpringGreen" Foreground="Black" Padding="10,5" Margin="0,0,5,0"
+                                                Visibility="{Binding IsPaused, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                                        
+                                        <Button Command="{Binding StopScanCommand}" Content="⏹️ Stop" 
+                                                Background="#8B0000" Foreground="White" Padding="10,5" Margin="0,0,10,0"/>
+                                    </StackPanel>
 
-                                <Separator Width="1" Background="#333" Margin="10,0"/>
+                                    <Button Command="{Binding LoadAllFilesCommand}" Content="📋 Refresh List" 
+                                            Background="#333" Foreground="White" Padding="10,5" Margin="0,0,10,0"/>
+                                    
+                                    <ToggleButton x:Name="OptionsToggle" Content="⚙️ Settings" 
+                                                  Background="#333" Foreground="White" Padding="10,5" Margin="0,0,10,0"/>
 
-                                <ToggleButton IsChecked="{Binding IsTranscribeViewVisible}" Content="🎙️ Transcribe" 
-                                              Background="{Binding IsTranscribeViewVisible, Converter={StaticResource ViewToColorConverter}, ConverterParameter=TRUE}" 
-                                              Foreground="White" Padding="10,5" Margin="10,0,0,0"/>
+                                    <Separator Width="1" Background="#333" Margin="5,0"/>
 
-                                <ToggleButton IsChecked="{Binding IsFileDetailsVisible}" Content="ℹ️ Details" 
-                                              Background="{Binding IsFileDetailsVisible, Converter={StaticResource ViewToColorConverter}, ConverterParameter=TRUE}" 
-                                              Foreground="White" Padding="10,5" Margin="10,0,0,0"/>
+                                    <ToggleButton IsChecked="{Binding IsTranscribeViewVisible}" Content="🎙️ Transcribe" 
+                                                  Background="{Binding IsTranscribeViewVisible, Converter={StaticResource ViewToColorConverter}, ConverterParameter=TRUE}" 
+                                                  Foreground="White" Padding="10,5" Margin="10,0,0,0"/>
 
-                                <CheckBox IsChecked="{Binding EnableIgnoreList}" Content="Enable Ignore List" VerticalAlignment="Center" Foreground="White" FontWeight="SemiBold" Margin="10,0,0,0"/>
+                                    <ToggleButton IsChecked="{Binding IsFileDetailsVisible}" Content="ℹ️ Details" 
+                                                  Background="{Binding IsFileDetailsVisible, Converter={StaticResource ViewToColorConverter}, ConverterParameter=TRUE}" 
+                                                  Foreground="White" Padding="10,5" Margin="10,0,0,0"/>
+
+                                    <CheckBox IsChecked="{Binding EnableIgnoreList}" Content="Filter Ignored" VerticalAlignment="Center" Foreground="White" FontWeight="SemiBold" Margin="10,0,0,0"/>
+                                </StackPanel>
+                                
+                                <!-- Scan Options Panel -->
+                                <Border Background="#222" CornerRadius="4" Padding="10" Margin="0,0,0,10"
+                                        Visibility="{Binding IsChecked, ElementName=OptionsToggle, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        
+                                        <!-- Drive Selection -->
+                                        <StackPanel Grid.Column="0" Margin="0,0,20,0">
+                                            <TextBlock Text="SELECT DRIVES:" FontWeight="Bold" Foreground="Gray" Margin="0,0,0,5"/>
+                                            <Border BorderBrush="#444" BorderThickness="1" Background="#1A1A1A" MaxHeight="100">
+                                                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                                    <ItemsControl ItemsSource="{Binding AvailableDrives}">
+                                                        <ItemsControl.ItemTemplate>
+                                                            <DataTemplate>
+                                                                <CheckBox IsChecked="{Binding IsSelected}" Margin="5,2" Foreground="White">
+                                                                    <TextBlock>
+                                                                        <Run Text="{Binding Name, Mode=OneWay}" FontWeight="Bold"/>
+                                                                        <Run Text=" (" Foreground="Gray"/>
+                                                                        <Run Text="{Binding Label, Mode=OneWay}" Foreground="Gray"/>
+                                                                        <Run Text=" - " Foreground="Gray"/>
+                                                                        <Run Text="{Binding FreeSpace, Mode=OneWay}" Foreground="SpringGreen"/>
+                                                                        <Run Text=" free)" Foreground="Gray"/>
+                                                                    </TextBlock>
+                                                                </CheckBox>
+                                                            </DataTemplate>
+                                                        </ItemsControl.ItemTemplate>
+                                                    </ItemsControl>
+                                                </ScrollViewer>
+                                            </Border>
+                                            <Button Command="{Binding LoadDrivesCommand}" Content="🔄 Refresh Drives" Background="Transparent" Foreground="SpringGreen" BorderThickness="0" HorizontalAlignment="Left" FontSize="10" Margin="0,2,0,0"/>
+                                        </StackPanel>
+                                        
+                                        <!-- Advanced Options -->
+                                        <StackPanel Grid.Column="1">
+                                            <TextBlock Text="PERFORMANCE:" FontWeight="Bold" Foreground="Gray" Margin="0,0,0,5"/>
+                                            <StackPanel Orientation="Horizontal" Margin="0,0,0,5">
+                                                 <CheckBox IsChecked="{Binding UseGpu}" 
+                                                           Content="{Binding GpuCheckboxContent}" 
+                                                           IsEnabled="{Binding IsGpuSelectionEnabled}"
+                                                           Foreground="White" Margin="0,0,15,0"
+                                                           ToolTip="Uses ComputeSharp to offload hashing to GPU"/>
+                                                 <CheckBox IsChecked="{Binding UseThreads}" Content="Use Multi-threading" Foreground="White" Margin="0,0,15,0"/>
+                                            </StackPanel>
+                                            <CheckBox IsChecked="{Binding VerifyGpuHash}" Content="Verify GPU Hashing (Slows performance, ensures accuracy)" 
+                                                      Foreground="#AAAAAA" FontSize="10" Margin="0,0,0,5"
+                                                      Visibility="{Binding UseGpu, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                                            <TextBlock Text="ℹ️ GPU acceleration requires CUDA-compatible hardware. Multi-threading improves speed on CPU." Foreground="Gray" FontSize="10" TextWrapping="Wrap"/>
+                                        </StackPanel>
+                                    </Grid>
+                                </Border>
                             </StackPanel>
 
-                            <StackPanel Grid.Column="1" Orientation="Horizontal">
+                            <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Top" Margin="0,10,0,10">
                                 <TextBlock Text="SORT BY:" Foreground="White" FontWeight="Bold" VerticalAlignment="Center" Margin="0,0,5,0" FontSize="11"/>
                                 <ComboBox ItemsSource="{Binding SortByOptions}" SelectedItem="{Binding SortBy}" 
-                                          Width="120" Margin="0,0,10,0"/>
+                                          Width="120" Margin="0,0,10,0" Height="25"/>
                                 
                                 <TextBlock Text="Type:" FontWeight="Bold" VerticalAlignment="Center" Margin="10,0,5,0" Foreground="White" FontSize="11"/>
                                 <ComboBox ItemsSource="{Binding FileTypeOptions}" SelectedItem="{Binding FileTypeFilter}" 
-                                          Width="100" Padding="5,2"/>
+                                          Width="100" Padding="5,2" Height="25"/>
                                 
                                 <TextBlock Text="Date Range:" FontWeight="Bold" VerticalAlignment="Center" Margin="10,0,5,0" Foreground="White" FontSize="11"/>
-                                <DatePicker SelectedDate="{Binding DateFilterStart}" Width="110" Background="#333" Foreground="Black" BorderThickness="1" BorderBrush="#555" Margin="0,0,5,0"/>
+                                <DatePicker SelectedDate="{Binding DateFilterStart}" Width="110" Background="#333" Foreground="Black" BorderThickness="1" BorderBrush="#555" Margin="0,0,5,0" Height="25"/>
                                 <TextBlock Text="to" VerticalAlignment="Center" Margin="0,0,5,0" Foreground="White"/>
-                                <DatePicker SelectedDate="{Binding DateFilterEnd}" Width="110" Foreground="Black" Margin="0,0,10,0"/>
+                                <DatePicker SelectedDate="{Binding DateFilterEnd}" Width="110" Foreground="Black" Margin="0,0,10,0" Height="25"/>
                             </StackPanel>
                         </Grid>
                         
@@ -733,6 +844,36 @@
             </ItemsControl>
         </ScrollViewer>
     </Grid>
+
+                    <!-- SETTINGS View -->
+                    <Grid Visibility="{Binding CurrentViewName, Converter={StaticResource ViewToVisibilityConverter}, ConverterParameter=SETTINGS}">
+                        <StackPanel Margin="20">
+                            <TextBlock Text="APPLICATION SETTINGS" FontWeight="Bold" Foreground="Gray" Margin="0,0,0,20"/>
+
+                            <GroupBox Header="Data Privacy" BorderBrush="#444" Foreground="White" Margin="0,0,0,20" Padding="10">
+                                <StackPanel>
+                                    <CheckBox IsChecked="{Binding IsAnalyticsEnabled}" Content="Allow anonymous data collection for improvement and bug fixes" 
+                                              Foreground="White" FontSize="14" Margin="0,5"/>
+                                    <TextBlock Text="We collect basic usage events (e.g., app launch, scan completion) to specific features. No personal file content is ever transmitted." 
+                                               Foreground="Gray" TextWrapping="Wrap" Margin="25,5,0,0"/>
+                                </StackPanel>
+                            </GroupBox>
+
+                            <GroupBox Header="About" BorderBrush="#444" Foreground="White" Padding="10">
+                                <StackPanel>
+                                    <StackPanel Orientation="Horizontal" Margin="0,5">
+                                        <TextBlock Text="App Version:" Foreground="Gray" Width="100"/>
+                                        <TextBlock Text="{Binding AppVersion}" Foreground="White" FontWeight="Bold"/>
+                                    </StackPanel>
+                                    <StackPanel Orientation="Horizontal" Margin="0,5">
+                                        <TextBlock Text="Developer:" Foreground="Gray" Width="100"/>
+                                        <TextBlock Text="Magicpoint.ai" Foreground="White"/>
+                                    </StackPanel>
+                                </StackPanel>
+                            </GroupBox>
+                        </StackPanel>
+                    </Grid>
+
                 </Grid>
             </Border>
         </Grid>
@@ -779,9 +920,36 @@
                 <StackPanel Orientation="Horizontal">
                     <TextBlock Text="Last Scanned: " Foreground="Gray"/>
                     <TextBlock Text="{Binding LastScannedTime}" Foreground="White" Margin="0,0,10,0"/>
-                    <TextBlock Text="SecureFileMonitor v1.0.0"/>
                 </StackPanel>
             </StatusBarItem>
         </StatusBar>
+        
+        <!-- EULA Overlay -->
+        <Grid Grid.RowSpan="2" Background="#D9000000" Visibility="{Binding IsEulaVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
+            <Border Background="#1E1E1E" BorderBrush="#444" BorderThickness="1" CornerRadius="8" Width="600" Height="500" HorizontalAlignment="Center" VerticalAlignment="Center">
+                <Border.Effect>
+                    <DropShadowEffect BlurRadius="20" ShadowDepth="10" Opacity="0.5" Direction="270" Color="Black"/>
+                </Border.Effect>
+                <Grid Margin="20">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+                    
+                    <TextBlock Text="WELCOME TO SECURE FILE MONITOR" FontSize="20" FontWeight="Bold" Foreground="SpringGreen" HorizontalAlignment="Center" Margin="0,0,0,20"/>
+                    
+                    <ScrollViewer Grid.Row="1" Margin="0,0,0,20" Background="#111" Padding="10">
+                        <TextBlock Text="{Binding EulaText}" Foreground="#CCC" FontFamily="Consolas" TextWrapping="Wrap"/>
+                    </ScrollViewer>
+                    
+                    <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right">
+                        <Button Command="{Binding DeclineEulaCommand}" Content="Decline (Exit)" Background="#8B0000" Foreground="White" Padding="15,8" Margin="0,0,10,0" FontWeight="Bold"/>
+                        <Button Command="{Binding AcceptEulaCommand}" Content="I Agree &amp; Launch" Background="SpringGreen" Foreground="Black" Padding="20,8" FontWeight="Bold"/>
+                    </StackPanel>
+                </Grid>
+            </Border>
+        </Grid>
+
     </Grid>
 </Window>

@@ -17,6 +17,8 @@ namespace SecureFileMonitor.Core.Services
         private const string BaseUrl = "https://www.google-analytics.com/mp/collect";
         
         private string _clientId;
+        
+        public bool IsEnabled { get; set; } = true;
 
         public GoogleAnalyticsService(ILogger<GoogleAnalyticsService> logger)
         {
@@ -47,6 +49,8 @@ namespace SecureFileMonitor.Core.Services
         {
             try
             {
+                if (!IsEnabled) return;
+
                 var url = $"{BaseUrl}?measurement_id={MeasurementId}&api_secret={ApiSecret}";
 
                 var payload = new

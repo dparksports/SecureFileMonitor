@@ -39,5 +39,16 @@ namespace SecureFileMonitor.Core.Services
         // Merkle Trees
         Task SaveMerkleTreeAsync(FileMerkleTree tree);
         Task<FileMerkleTree> GetMerkleTreeAsync(string filePath);
+
+        // Settings
+        Task SaveSettingAsync(string key, string value);
+        Task<string?> GetSettingAsync(string key);
+        
+        // Scan State
+        Task AddDirectoryToScanQueueAsync(string path, string driveLetter);
+        Task<Models.DirectoryScanState?> GetNextDirectoryToScanAsync();
+        Task MarkDirectoryAsProcessedAsync(int id);
+        Task ClearScanQueueAsync();
+        Task<int> GetPendingScanCountAsync();
     }
 }

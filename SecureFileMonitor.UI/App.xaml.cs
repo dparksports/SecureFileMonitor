@@ -39,9 +39,9 @@ namespace SecureFileMonitor.UI
                     services.AddSingleton<IUsnJournalService, SecureFileMonitor.Core.Services.UsnJournalService>();
                     services.AddSingleton<IEtwMonitorService, SecureFileMonitor.Core.Services.EtwMonitorService>();
                     services.AddSingleton<IDatabaseService, SecureFileMonitor.Core.Services.DatabaseService>();
-                    services.AddSingleton<IHasherService, SecureFileMonitor.Core.Services.CpuHasherService>();
+                    // services.AddSingleton<IHasherService, SecureFileMonitor.Core.Services.CpuHasherService>(); // Replaced by Factory
+                    services.AddSingleton<SecureFileMonitor.Core.Services.HasherFactory>();
                     services.AddSingleton<IMerkleTreeService, SecureFileMonitor.Core.Services.MerkleTreeService>();
-                    services.AddSingleton<IAiService, SecureFileMonitor.Core.Services.AiService>();
                     services.AddSingleton<IAiService, SecureFileMonitor.Core.Services.AiService>();
                     services.AddSingleton<IAnalyticsService, SecureFileMonitor.Core.Services.GoogleAnalyticsService>();
                     services.AddSingleton<IFileScannerService, SecureFileMonitor.Core.Services.FileScannerService>();

@@ -10,7 +10,6 @@ namespace SecureFileMonitor.Core.Services
 {
     public class MerkleTreeService : IMerkleTreeService
     {
-        private readonly IHasherService _hasherService;
         private const int BlockSize = 4 * 1024 * 1024; // 4MB
 
         public string SerializeTree(MerkleNode root)
@@ -24,14 +23,20 @@ namespace SecureFileMonitor.Core.Services
             return System.Text.Json.JsonSerializer.Deserialize<MerkleNode>(json);
         }
 
-        public MerkleTreeService(IHasherService hasherService)
+        private readonly HasherFactory _hasherFactory;
+
+        public MerkleTreeService(HasherFactory hasherFactory)
         {
-            _hasherService = hasherService;
+            _hasherFactory = hasherFactory;
         }
 
         public async Task<MerkleNode> BuildTreeAsync(string filePath)
         {
-            var leafHashes = await _hasherService.ComputeBlockHashesAsync(filePath, BlockSize);
+            // For Merkle Tree construction, we defaulting to CPU for now for stability.
+            // Future improvement: Pass in settings to use GPU.
+            var hasher = _hasherFactory.Create(useGpu: false, useThreads: false);
+
+            var leafHashes = await hasher.ComputeBlockHashesAsync(filePath, BlockSize);
             
             var leaves = leafHashes.Select((h, i) => new MerkleNode 
             { 

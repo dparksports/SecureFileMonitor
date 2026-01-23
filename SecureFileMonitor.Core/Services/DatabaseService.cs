@@ -32,7 +32,10 @@ namespace SecureFileMonitor.Core.Services
             await _connection!.CreateTableAsync<IgnoreRule>();
             await _connection!.CreateTableAsync<TranscriptionTask>();
             await _connection!.CreateTableAsync<IgnoredProcess>();
+            await _connection!.CreateTableAsync<IgnoredProcess>();
             await _connection!.CreateTableAsync<FileMerkleTree>();
+            await _connection!.CreateTableAsync<AppSetting>();
+            await _connection!.CreateTableAsync<DirectoryScanState>();
         }
 
         public async Task SaveFileEntryAsync(FileEntry entry)
@@ -242,6 +245,60 @@ namespace SecureFileMonitor.Core.Services
         public async Task<FileMerkleTree> GetMerkleTreeAsync(string filePath)
         {
             return await _connection!.Table<FileMerkleTree>().Where(mt => mt.FilePath == filePath).FirstOrDefaultAsync();
+        }
+
+        // Settings
+        public async Task SaveSettingAsync(string key, string value)
+        {
+            await _connection!.InsertOrReplaceAsync(new AppSetting { Key = key, Value = value });
+        }
+
+        public async Task<string?> GetSettingAsync(string key)
+        {
+            var setting = await _connection!.Table<AppSetting>().Where(x => x.Key == key).FirstOrDefaultAsync();
+            return setting?.Value;
+        }
+
+        // Scan State Persistence
+        public async Task AddDirectoryToScanQueueAsync(string path, string driveLetter)
+        {
+            await _connection!.InsertAsync(new DirectoryScanState 
+            { 
+                Path = path, 
+                DriveLetter = driveLetter, 
+                IsProcessed = false, 
+                QueuedAt = DateTime.Now 
+            });
+        }
+
+        public async Task<DirectoryScanState?> GetNextDirectoryToScanAsync()
+        {
+            // FIDO-like queue: Get oldest unprocessed
+            return await _connection!.Table<DirectoryScanState>()
+                                     .Where(x => !x.IsProcessed)
+                                     .OrderBy(x => x.QueuedAt)
+                                     .FirstOrDefaultAsync();
+        }
+
+        public async Task MarkDirectoryAsProcessedAsync(int id)
+        {
+            var item = await _connection!.GetAsync<DirectoryScanState>(id);
+            if (item != null)
+            {
+                // We delete processed items to keep table small, or we could mark them. 
+                // For a pause/resume queue, deleting is usually cleaner for indefinite running.
+                await _connection!.DeleteAsync(item);
+            }
+        }
+
+        public async Task ClearScanQueueAsync()
+        {
+            await _connection!.DeleteAllAsync<DirectoryScanState>();
+        }
+
+        public async Task<int> GetPendingScanCountAsync()
+        {
+             return await _connection!.Table<DirectoryScanState>().CountAsync();
         }
     }
 }
