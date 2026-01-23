@@ -114,12 +114,7 @@
                 <Button Command="{Binding SwitchViewCommand}" CommandParameter="FILES_CHANGES" Content="🕒 FILES CHANGES" 
                         Background="{Binding CurrentViewName, Converter={StaticResource ViewToColorConverter}, ConverterParameter=FILES_CHANGES}" 
                         Foreground="White" Padding="10" Margin="0,2,0,0" HorizontalContentAlignment="Left" BorderThickness="0"/>
-                <Button Command="{Binding SwitchViewCommand}" CommandParameter="SEARCH" Content="🔍 SEMANTIC SEARCH" 
-                        Background="{Binding CurrentViewName, Converter={StaticResource ViewToColorConverter}, ConverterParameter=SEARCH}" 
-                        Foreground="White" Padding="10" Margin="0,2,0,0" HorizontalContentAlignment="Left" BorderThickness="0"/>
-                <Button Command="{Binding SwitchViewCommand}" CommandParameter="TRANSCRIBE" Content="🎙️ TRANSCRIBE" 
-                        Background="{Binding CurrentViewName, Converter={StaticResource ViewToColorConverter}, ConverterParameter=TRANSCRIBE}" 
-                        Foreground="White" Padding="10" Margin="0,2,0,0" HorizontalContentAlignment="Left" BorderThickness="0"/>
+
 
                 <Button Command="{Binding SwitchViewCommand}" CommandParameter="IGNORE_LIST" Content="🚫 IGNORE LIST" 
                         Background="{Binding CurrentViewName, Converter={StaticResource ViewToColorConverter}, ConverterParameter=IGNORE_LIST}" 
@@ -179,9 +174,7 @@
 
                                     <Separator Width="1" Background="#333" Margin="5,0"/>
 
-                                    <ToggleButton IsChecked="{Binding IsTranscribeViewVisible}" Content="🎙️ Transcribe" 
-                                                  Background="{Binding IsTranscribeViewVisible, Converter={StaticResource ViewToColorConverter}, ConverterParameter=TRUE}" 
-                                                  Foreground="White" Padding="10,5" Margin="10,0,0,0"/>
+
 
                                     <ToggleButton IsChecked="{Binding IsFileDetailsVisible}" Content="ℹ️ Details" 
                                                   Background="{Binding IsFileDetailsVisible, Converter={StaticResource ViewToColorConverter}, ConverterParameter=TRUE}" 
