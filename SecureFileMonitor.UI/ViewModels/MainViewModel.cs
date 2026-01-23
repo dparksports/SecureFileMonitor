@@ -808,11 +808,20 @@ namespace SecureFileMonitor.UI.ViewModels
             CurrentViewName = "DETAILS";
         }
         
-        [RelayCommand]
-        private void OpenInExplorer(FileEntry? file)
+        private string? GetFilePathFromObject(object? item)
         {
-            if (file == null) return;
-            string path = file.FilePath;
+            if (item is FileEntry entry) return entry.FilePath;
+            if (item is FileActivityEvent evt) return evt.FilePath;
+            if (item is string path) return path;
+            return null;
+        }
+
+        [RelayCommand]
+        private void OpenInExplorer(object? item)
+        {
+            string? path = GetFilePathFromObject(item);
+            if (string.IsNullOrEmpty(path)) return;
+            
             try
             {
                 if (File.Exists(path))
@@ -833,15 +842,17 @@ namespace SecureFileMonitor.UI.ViewModels
         }
 
         [RelayCommand]
-        private void OpenInVsCode(FileEntry? file)
+        private void OpenInVsCode(object? item)
         {
-            if (file == null) return;
+            string? path = GetFilePathFromObject(item);
+            if (string.IsNullOrEmpty(path)) return;
+            
             try
             {
                 Process.Start(new ProcessStartInfo
                 {
-                    FileName = "code.cmd", // Use code.cmd specifically for better CMD resolution
-                    Arguments = $"\"{file.FilePath}\"",
+                    FileName = "code.cmd", 
+                    Arguments = $"\"{path}\"",
                     UseShellExecute = true,
                     CreateNoWindow = true
                 });
@@ -853,7 +864,7 @@ namespace SecureFileMonitor.UI.ViewModels
                 try
                 {
                     // Fallback to "code"
-                    Process.Start(new ProcessStartInfo { FileName = "code", Arguments = $"\"{file.FilePath}\"", UseShellExecute = true });
+                    Process.Start(new ProcessStartInfo { FileName = "code", Arguments = $"\"{path}\"", UseShellExecute = true });
                 }
                 catch (Exception ex)
                 {
@@ -866,12 +877,14 @@ namespace SecureFileMonitor.UI.ViewModels
         }
 
         [RelayCommand]
-        private void OpenInPowerShell(FileEntry? file)
+        private void OpenInPowerShell(object? item)
         {
-            if (file == null) return;
+            string? path = GetFilePathFromObject(item);
+            if (string.IsNullOrEmpty(path)) return;
+            
             try
             {
-                string dir = File.Exists(file.FilePath) ? Path.GetDirectoryName(file.FilePath)! : file.FilePath;
+                string dir = File.Exists(path) ? Path.GetDirectoryName(path)! : path;
                 Process.Start(new ProcessStartInfo("powershell.exe", $"-NoExit -Command \"Set-Location -Path '{dir}'\"") { UseShellExecute = true });
 
             }
@@ -885,12 +898,14 @@ namespace SecureFileMonitor.UI.ViewModels
         }
 
         [RelayCommand]
-        private void OpenInCmd(FileEntry? file)
+        private void OpenInCmd(object? item)
         {
-            if (file == null) return;
+            string? path = GetFilePathFromObject(item);
+            if (string.IsNullOrEmpty(path)) return;
+            
             try
             {
-                string dir = File.Exists(file.FilePath) ? Path.GetDirectoryName(file.FilePath)! : file.FilePath;
+                string dir = File.Exists(path) ? Path.GetDirectoryName(path)! : path;
                 Process.Start(new ProcessStartInfo("cmd.exe", $"/K \"cd /d \"{dir}\"\"") { UseShellExecute = true });
 
             }
