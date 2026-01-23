@@ -1,44 +1,45 @@
-# SecureFileMonitor
+# Secure Files
 
-![SecureFileMonitor Dashboard](docs/images/app_screenshot.png)
+![Secure Files Preview](assets/app_preview.png)
 
-**SecureFileMonitor** is a robust, real-time file integrity monitoring solution built for modern Windows environments. It enables seamless tracking of file system events with cryptographic precision, leveraging accelerated hashing and local AI integration for forensic analysis.
+## Overview
 
-## 🚀 Features
+**Secure Files** is a robust file integrity monitoring solution designed for Windows. It provides real-time tracking of file changes, cryptographic hashing for integrity verification, and audit logging to detect unauthorized modifications.
 
-### 🛡️ Integrity & Security
-- **Real-Time Tracking**: Instant detection of file changes, creations, and deletions.
-- **Cryptographic Hashing**: Multi-threaded SHA256 computation ensures data verification.
-- **Merkle Tree Architecture**: Maintains a verified state of directory structures for forensic auditing.
+Built with a focus on performance and security, it features a modern, dark-themed UI ("Auto Command" style) and is optimized for efficient background processing.
 
-### ⚡ Performance & AI
-- **Hardware Acceleration**: Optional GPU offloading for high-throughput hashing operations.
-- **Local AI Processing**: Integrated `Whisper.net` for offline, privacy-first audio transcription and analysis.
-- **Smart Resource Management**: Dynamic thread scaling and pause/resume capabilities.
+## Key Features
 
-### 💾 Persistence
-- **SQLite Backend**: Robust local database storage for persistence across sessions.
-- **Crash Recovery**: Automatic state restoration ensures no monitoring gaps.
+*   **File Integrity Vault**: Maintains a database of file states (Size, Modified Date, Hash) to detect tampering.
+*   **Cryptographic Verification**: Computes SHA-256 hashes for files to ensure 100% integrity assurance.
+*   **Smart Scanning**:
+    *   **Skip Logic**: Automatically skips system directories like `Windows` and `Program Files` to focus on user data.
+    *   **Multi-threading**: Utilizes CPU multi-threading for fast parallel scanning.
+*   **Live Monitoring**: Tracks real-time file system events (Create, Modify, Delete, Rename).
+*   **Audit Logging**: detailed logs of all file activities for security audits.
+*   **Ignore List**: Customizable rules to exclude specific files, folders, or extensions from monitoring.
 
-## 📦 Installation
+## Getting Started
 
-1. Download the latest release from the [GitHub Releases](../../releases) page.
-2. Extract the archive to a local directory.
-3. Run `SecureFileMonitor.UI.exe`.
+### Installation
+1.  Download the latest `SecureFileMonitor_Release.zip` from the [Releases](https://github.com/dparksports/SecureFileMonitor/releases) page.
+2.  Extract the archive to a folder of your choice.
+3.  Run `SecureFileMonitor.UI.exe`.
 
-## 🛠️ Build
+### Usage
+1.  **Select Drives**: Choose the drives you wish to monitor from the Dashboard.
+2.  **Scan Full**: Click "Scan Full" to build the initial integrity baseline.
+3.  **Monitor**: Switch to the "Monitor Live" tab to watch for real-time changes.
+4.  **Review Changes**: The "Vault" tab highlights files that have changed since the last scan.
 
-**Requirements:**
-- Windows 10/11 (x64)
-- .NET 10.0 SDK
+## Settings
+*   **Use Multi-threading**: Toggle parallel processing for faster scans implementation.
+*   **Skip Windows / Program Files**: Enable these filters to exclude system files and improve performance.
+*   **Verify GPU Hash**: (Optional) Experimental verification mode.
 
-```powershell
-# Clone the repository
-git clone https://github.com/dparksports/SecureFileMonitor.git
+## System Requirements
+*   **OS**: Windows 10/11 (64-bit)
+*   **Runtime**: .NET 10.0 (included in release or installed separately)
 
-# Build the solution
-dotnet build -c Release
-```
-
----
-Made with ❤️ in California.
+## License
+MIT License
