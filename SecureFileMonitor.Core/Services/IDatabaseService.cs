@@ -8,6 +8,7 @@ namespace SecureFileMonitor.Core.Services
     {
         Task InitializeAsync(string password);
         Task SaveFileEntryAsync(FileEntry entry);
+        Task SaveFileEntriesBatchAsync(IEnumerable<FileEntry> entries);
         Task<FileEntry> GetFileEntryAsync(string filePath);
         Task DeleteFileEntryAsync(string filePath);
         Task<IEnumerable<FileEntry>> GetAllEntriesAsync();
@@ -50,5 +51,11 @@ namespace SecureFileMonitor.Core.Services
         Task MarkDirectoryAsProcessedAsync(int id);
         Task ClearScanQueueAsync();
         Task<int> GetPendingScanCountAsync();
+        
+        // Batch Scan State
+        Task<IEnumerable<Models.DirectoryScanState>> GetNextDirectoryBatchToScanAsync(int limit);
+        Task AddDirectoryToScanQueueBatchAsync(IEnumerable<string> paths, string driveLetter);
+        Task MarkDirectoriesAsProcessedBatchAsync(IEnumerable<int> ids);
+        Task<int> GetPendingScanCountForDriveAsync(string driveLetter);
     }
 }

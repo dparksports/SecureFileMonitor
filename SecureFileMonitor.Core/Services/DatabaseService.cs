@@ -57,6 +57,19 @@ namespace SecureFileMonitor.Core.Services
             }
         }
 
+        public async Task SaveFileEntriesBatchAsync(IEnumerable<FileEntry> entries)
+        {
+            await _connection!.RunInTransactionAsync(tran =>
+            {
+                foreach (var entry in entries)
+                {
+                    // Manual Upsert logic inside transaction
+                    // (SQLite-net InsertOrReplace is easiest but let's stick to simple InsertOrReplace)
+                    tran.InsertOrReplace(entry);
+                }
+            });
+        }
+
         public async Task DeleteFileEntryAsync(string filePath)
         {
              // Assumes FilePath is primary key or unique index
@@ -281,6 +294,24 @@ namespace SecureFileMonitor.Core.Services
             });
         }
 
+        public async Task AddDirectoryToScanQueueBatchAsync(IEnumerable<string> paths, string driveLetter)
+        {
+            await _connection!.RunInTransactionAsync(tran =>
+            {
+                var now = DateTime.Now;
+                foreach (var path in paths)
+                {
+                    tran.Insert(new DirectoryScanState 
+                    { 
+                        Path = path, 
+                        DriveLetter = driveLetter, 
+                        IsProcessed = false, 
+                        QueuedAt = now
+                    });
+                }
+            });
+        }
+
         public async Task<DirectoryScanState?> GetNextDirectoryToScanAsync()
         {
             // FIDO-like queue: Get oldest unprocessed
@@ -309,6 +340,33 @@ namespace SecureFileMonitor.Core.Services
         public async Task<int> GetPendingScanCountAsync()
         {
              return await _connection!.Table<DirectoryScanState>().CountAsync();
+        }
+
+        public async Task<IEnumerable<DirectoryScanState>> GetNextDirectoryBatchToScanAsync(int limit)
+        {
+            return await _connection!.Table<DirectoryScanState>()
+                                     .Where(x => !x.IsProcessed)
+                                     .OrderBy(x => x.QueuedAt)
+                                     .Take(limit)
+                                     .ToListAsync();
+        }
+
+        public async Task MarkDirectoriesAsProcessedBatchAsync(IEnumerable<int> ids)
+        {
+            await _connection!.RunInTransactionAsync(tran =>
+            {
+                foreach(var id in ids)
+                {
+                    tran.Delete<DirectoryScanState>(id);
+                }
+            });
+        }
+
+        public async Task<int> GetPendingScanCountForDriveAsync(string driveLetter)
+        {
+            return await _connection!.Table<DirectoryScanState>()
+                                     .Where(x => x.DriveLetter == driveLetter)
+                                     .CountAsync();
         }
     }
 }

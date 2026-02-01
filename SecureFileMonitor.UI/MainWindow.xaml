@@ -542,6 +542,15 @@
                                          <CheckBox Style="{StaticResource ModernToggleStyle}" IsChecked="{Binding VerifyGpuHash}" Content="GPU Hash Verification" 
                                                   Tag="Use advanced GPU acceleration to verify file integrity (Experimental)."
                                                   Visibility="{Binding UseGpu, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                                                  
+                                         <CheckBox Style="{StaticResource ModernToggleStyle}" IsChecked="{Binding ForceRescan}" Content="Force Full Re-scan" 
+                                                  Tag="Force re-hashing of all files, even if modified date is unchanged."/>
+
+                                         <Button Command="{Binding ClearScanQueueCommand}" Content="🗑️ Reset Scan Queue" 
+                                                 Margin="0,15,0,0" HorizontalAlignment="Left"
+                                                 Background="Transparent" Foreground="#FF6666" BorderThickness="0"
+                                                 IsEnabled="{Binding IsScanning, Converter={StaticResource InverseBooleanConverter}}"
+                                                 ToolTip="Clears any pending or stuck scan tasks from the database."/>
                                     </StackPanel>
                                 </Grid>
                             </StackPanel>
@@ -685,6 +694,7 @@
                                         <RowDefinition Height="Auto"/> <!-- Timeline -->
                                         <RowDefinition Height="Auto"/> <!-- Chips -->
                                         <RowDefinition Height="*"/>    <!-- DataGrid -->
+                                        <RowDefinition Height="Auto"/> <!-- Load More Button -->
                                         <RowDefinition Height="Auto"/> <!-- Splitter -->
                                         <RowDefinition Height="200"/>  <!-- History -->
                                     </Grid.RowDefinitions>
@@ -829,11 +839,36 @@
                                         </DataGrid.Columns>
                                     </DataGrid>
 
+                                    <!-- Load More Button -->
+                                    <Button Grid.Row="3" Command="{Binding LoadMoreFilesCommand}" Content="⬇️ Load Next 2,000 Files" 
+                                            Background="#222" Foreground="#888" BorderBrush="#333" BorderThickness="0,1,0,0" Padding="10"
+                                            Visibility="{Binding HasMoreFiles, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                        <Button.Style>
+                                            <Style TargetType="Button">
+                                                 <Setter Property="Template">
+                                                    <Setter.Value>
+                                                        <ControlTemplate TargetType="Button">
+                                                            <Border Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}">
+                                                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                            </Border>
+                                                            <ControlTemplate.Triggers>
+                                                                <Trigger Property="IsMouseOver" Value="True">
+                                                                    <Setter Property="Background" Value="#333"/>
+                                                                    <Setter Property="Foreground" Value="White"/>
+                                                                </Trigger>
+                                                            </ControlTemplate.Triggers>
+                                                        </ControlTemplate>
+                                                    </Setter.Value>
+                                                </Setter>
+                                            </Style>
+                                        </Button.Style>
+                                    </Button>
+
                                     <!-- Splitter -->
-                                    <GridSplitter Grid.Row="3" Height="5" HorizontalAlignment="Stretch" Background="#333" ShowsPreview="True"/>
+                                    <GridSplitter Grid.Row="4" Height="5" HorizontalAlignment="Stretch" Background="#333" ShowsPreview="True"/>
 
                                     <!-- History Panel -->
-                                    <Border Grid.Row="4" Background="#1A1A1A" BorderBrush="#333" BorderThickness="0,1,0,0">
+                                    <Border Grid.Row="5" Background="#1A1A1A" BorderBrush="#333" BorderThickness="0,1,0,0">
                                         <Grid>
                                             <Grid.RowDefinitions>
                                                 <RowDefinition Height="Auto"/>
@@ -1411,6 +1446,22 @@
                                 </StackPanel>
                             </GroupBox>
 
+                            <GroupBox Header="Advanced Settings" BorderBrush="#444" Foreground="White" Padding="10" Margin="0,0,0,10">
+                                <StackPanel>
+                                    <CheckBox Content="Skip 'Windows' folder" IsChecked="{Binding SkipWindows}" Foreground="#AAA" Margin="0,0,0,5"/>
+                                    <CheckBox Content="Skip 'Program Files'" IsChecked="{Binding SkipProgramFiles}" Foreground="#AAA" Margin="0,0,0,5"/>
+                                    <CheckBox Content="Skip '$Recycle.Bin' folders" IsChecked="{Binding SkipRecycleBin}" Foreground="#AAA" Margin="0,0,0,10"/>
+                                    
+                                    <TextBlock Text="Database Batch Write Size" Foreground="White" Margin="0,10,0,5"/>
+                                    <TextBox Text="{Binding ScanBatchSize}" Width="100" HorizontalAlignment="Left" Background="#222" Foreground="White" BorderBrush="#444" Padding="5"/>
+                                    <TextBlock Text="Higher values = Faster scans, but more data lost if app crashes." Foreground="#666" FontSize="11" Margin="0,2,0,10"/>
+
+                                    <TextBlock Text="Directory Processing Batch Size" Foreground="White" Margin="0,10,0,5"/>
+                                    <TextBox Text="{Binding DirectoryBatchSize}" Width="100" HorizontalAlignment="Left" Background="#222" Foreground="White" BorderBrush="#444" Padding="5"/>
+                                    <TextBlock Text="Number of directories to process in a single transaction (Default: 100)." Foreground="#666" FontSize="11" Margin="0,2,0,10"/>
+                                </StackPanel>
+                            </GroupBox>
+
                             <GroupBox Header="About" BorderBrush="#444" Foreground="White" Padding="10">
                                 <StackPanel>
                                     <StackPanel Orientation="Horizontal" Margin="0,5">
@@ -1466,7 +1517,10 @@
                     <Separator Width="1" Background="#333" Margin="10,0"/>
 
                     <TextBlock Text="Last Scanned: " Foreground="Gray"/>
-                    <TextBlock Text="{Binding LastScannedTime}" Foreground="White" Margin="0,0,15,0"/>
+                    <TextBlock Text="{Binding LastScannedTime}" Foreground="#AAA" Margin="5,0,0,0"/>
+                    <TextBlock Text=" - " Foreground="#444" Margin="5,0,5,0"/>
+                     <TextBlock Text="Scanned: " FontWeight="Bold" Foreground="White"/>
+                    <TextBlock Text="{Binding ScannedFilesCount}" Foreground="White" Margin="5,0,0,0"/>
 
                     <Separator Width="1" Background="#333" Margin="10,0"/>
                     

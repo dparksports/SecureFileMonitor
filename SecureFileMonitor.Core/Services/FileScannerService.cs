@@ -21,8 +21,14 @@ namespace SecureFileMonitor.Core.Services
         // Large file hash queue (thread-safe)
         private readonly System.Collections.Concurrent.ConcurrentQueue<string> _largeFileHashQueue = new();
         
+        // Write Buffer
+        private List<FileEntry> _fileWriteBuffer = new();
+        private int _batchSize = 10000; // Default
+
+        
         // Pause Control
         private bool _isPaused = false;
+        private int _scannedFilesCount = 0; // Tally for progress reporting
         
         public event EventHandler<(int Remaining, int Total, TimeSpan? ETA)>? OnHashProgressChanged;
 
@@ -54,14 +60,21 @@ namespace SecureFileMonitor.Core.Services
             public bool IsPaused => false; // handled externally
         }
 
-        public async Task ScanDriveAsync(string driveLetter, bool scanReparseFolders, bool skipWindows, bool skipProgramFiles, bool skipRecycleBin, bool forceFullScan, IProgress<(string Status, double? Percent, TimeSpan? ETA)> progress, CancellationToken cancellationToken)
+        public async Task ScanDriveAsync(string driveLetter, bool scanReparseFolders, bool skipWindows, bool skipProgramFiles, bool skipRecycleBin, bool forceFullScan, IProgress<(string Status, double? Percent, TimeSpan? ETA, int? ScannedCount)> progress, CancellationToken cancellationToken)
         {
             var ignoreRules = (await _dbService.GetAllIgnoreRulesAsync()).ToList();
             
             // 1. Get Settings for Hasher Logic
             string? useGpuVal = await _dbService.GetSettingAsync("UseGpu");
             string? useThreadsVal = await _dbService.GetSettingAsync("UseThreads");
+
             string? verifyVal = await _dbService.GetSettingAsync("VerifyGpuHash");
+            string? batchSizeVal = await _dbService.GetSettingAsync("ScanBatchSize");
+            string? dirBatchSizeVal = await _dbService.GetSettingAsync("DirectoryBatchSize");
+
+            if (int.TryParse(batchSizeVal, out int bSize) && bSize > 0) _batchSize = bSize;
+            else _batchSize = 10000;
+
             
             bool useGpu = bool.TryParse(useGpuVal, out bool g) && g;
             bool useThreads = bool.TryParse(useThreadsVal, out bool t) && t;
@@ -87,74 +100,109 @@ namespace SecureFileMonitor.Core.Services
             catch { /* Ignore */ }
 
             // 2. Initialize Scan Queue (Iterative/Persistent)
-            if (await _dbService.GetPendingScanCountAsync() == 0)
+            // If forcing full scan, we want to ensure we start fresh.
+            if (forceFullScan)
+            {
+                await _dbService.ClearScanQueueAsync();
+            }
+
+            // Add root if queue is empty for THIS DRIVE
+            if (await _dbService.GetPendingScanCountForDriveAsync(driveLetter) == 0)
             {
                 await _dbService.AddDirectoryToScanQueueAsync(driveLetter, driveLetter);
             }
 
-            // 3. Process Queue
+            // 3. Process Queue in Batches
+            int directoryBatchSize = 100; // Default
+            if (int.TryParse(dirBatchSizeVal, out int dBatch) && dBatch > 0) directoryBatchSize = dBatch;
+
             while (!_isPaused && !cancellationToken.IsCancellationRequested)
             {
-                var dirState = await _dbService.GetNextDirectoryToScanAsync();
-                if (dirState == null) break; 
+                // Fetch a batch of directories to process
+                var dirBatch = (await _dbService.GetNextDirectoryBatchToScanAsync(directoryBatchSize)).ToList();
+                if (dirBatch.Count == 0) break; 
 
-                // Filter by drive if we are specifically scanning one drive? 
-                if (!dirState.Path.StartsWith(driveLetter, StringComparison.OrdinalIgnoreCase))
+                var processedIds = new List<int>();
+                var newSubDirectories = new List<string>();
+
+                foreach (var dirState in dirBatch)
                 {
-                     // Simple skip for now if it doesn't match the current drive
-                     // In a real multi-drive resume scenario, this might need refinement
-                }
+                    if (cancellationToken.IsCancellationRequested || _isPaused) break;
 
-                // --- ROBUST SKIP LOGIC FOR QUEUED ITEMS ---
-                if (skipWindows || skipProgramFiles || skipRecycleBin)
-                {
-                    bool shouldSkip = false;
-                    var segments = dirState.Path.Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-                    
-                    if (skipWindows && segments.Any(s => s.Equals("Windows", StringComparison.OrdinalIgnoreCase)))
-                        shouldSkip = true;
-                        
-                    if (!shouldSkip && skipProgramFiles && segments.Any(s => s.Equals("Program Files", StringComparison.OrdinalIgnoreCase) || s.Equals("Program Files (x86)", StringComparison.OrdinalIgnoreCase)))
-                        shouldSkip = true;
-
-                    if (!shouldSkip && skipRecycleBin && segments.Any(s => s.Equals("$Recycle.Bin", StringComparison.OrdinalIgnoreCase)))
-                        shouldSkip = true;
-
-                    if (shouldSkip)
+                    // Filter by drive check (lightweight)
+                    if (!dirState.Path.StartsWith(driveLetter, StringComparison.OrdinalIgnoreCase))
                     {
-                         await _dbService.MarkDirectoryAsProcessedAsync(dirState.Id);
+                         // Item belongs to another drive session. Skip processing but DO NOT mark as processed.
+                         // This allows subsequent scans for other drives to pick it up.
                          continue;
                     }
-                }
-                // ------------------------------------------
 
-                if (cancellationToken.IsCancellationRequested) break;
-                if (_isPaused) break;
+                    // --- ROBUST SKIP LOGIC FOR QUEUED ITEMS ---
+                    if (skipWindows || skipProgramFiles || skipRecycleBin)
+                    {
+                        bool shouldSkip = false;
+                        var segments = dirState.Path.Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+                        
+                        if (skipWindows && segments.Any(s => s.Equals("Windows", StringComparison.OrdinalIgnoreCase)))
+                            shouldSkip = true;
+                            
+                        if (!shouldSkip && skipProgramFiles && segments.Any(s => s.Equals("Program Files", StringComparison.OrdinalIgnoreCase) || s.Equals("Program Files (x86)", StringComparison.OrdinalIgnoreCase)))
+                            shouldSkip = true;
 
-                try
-                {
-                    var dirInfo = new DirectoryInfo(dirState.Path);
-                    await ScanSingleDirectoryAsync(dirInfo, hasher, scanReparseFolders, skipWindows, skipProgramFiles, skipRecycleBin, forceFullScan, ignoreRules, progress, cancellationToken, state);
+                        if (!shouldSkip && skipRecycleBin && segments.Any(s => s.Equals("$Recycle.Bin", StringComparison.OrdinalIgnoreCase)))
+                            shouldSkip = true;
+
+                        if (shouldSkip)
+                        {
+                             processedIds.Add(dirState.Id);
+                             continue;
+                        }
+                    }
+                    // ------------------------------------------
+
+                    try
+                    {
+                        var dirInfo = new DirectoryInfo(dirState.Path);
+                        var subDirs = await ScanSingleDirectoryAsync(dirInfo, hasher, scanReparseFolders, skipWindows, skipProgramFiles, skipRecycleBin, forceFullScan, ignoreRules, progress, cancellationToken, state);
+                        newSubDirectories.AddRange(subDirs);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning($"Error scanning {dirState.Path}: {ex.Message}");
+                    }
+                    finally
+                    {
+                        processedIds.Add(dirState.Id);
+                    }
                 }
-                catch (Exception ex)
+
+                // Batch DB Updates
+                if (newSubDirectories.Count > 0)
                 {
-                    _logger.LogWarning($"Error scanning {dirState.Path}: {ex.Message}");
+                    await _dbService.AddDirectoryToScanQueueBatchAsync(newSubDirectories, driveLetter);
                 }
-                finally
+
+                if (processedIds.Count > 0)
                 {
-                    await _dbService.MarkDirectoryAsProcessedAsync(dirState.Id);
+                    await _dbService.MarkDirectoriesAsProcessedBatchAsync(processedIds);
                 }
             }
+            
+            // Final Flush
+            await FlushBufferAsync();
+
         }
 
-        private async Task ScanSingleDirectoryAsync(DirectoryInfo directory, IHasherService hasher, bool scanReparseFolders, bool skipWindows, bool skipProgramFiles, bool skipRecycleBin, bool forceFullScan,
+        private async Task<List<string>> ScanSingleDirectoryAsync(DirectoryInfo directory, IHasherService hasher, bool scanReparseFolders, bool skipWindows, bool skipProgramFiles, bool skipRecycleBin, bool forceFullScan,
             List<IgnoreRule> ignoreRules, 
-            IProgress<(string Status, double? Percent, TimeSpan? ETA)>? progress, 
+            IProgress<(string Status, double? Percent, TimeSpan? ETA, int? ScannedCount)>? progress, 
             CancellationToken cancellationToken,
             ScanState state)
         {
-            // Report Progress
-            progress?.Report(($"Scanning: {directory.FullName}", null, null));
+            var foundSubDirs = new List<string>();
+
+            // Report Progress (Clean path only, count passed separately)
+            progress?.Report((directory.FullName, null, null, _scannedFilesCount));
 
             var enumOptions = new EnumerationOptions { AttributesToSkip = 0, RecurseSubdirectories = false, IgnoreInaccessible = true };
 
@@ -163,7 +211,7 @@ namespace SecureFileMonitor.Core.Services
                  // 1. Queue Subdirectories (Breadth-First Expansion)
                  foreach (var subDir in directory.EnumerateDirectories("*", enumOptions))
                  {
-                     if (cancellationToken.IsCancellationRequested) return;
+                     if (cancellationToken.IsCancellationRequested) return foundSubDirs;
 
                       // --- SKIP LOGIC ---
                       if (skipWindows && subDir.Name.Equals("Windows", StringComparison.OrdinalIgnoreCase)) continue;
@@ -175,21 +223,23 @@ namespace SecureFileMonitor.Core.Services
                      if (isReparse && !scanReparseFolders) continue;
 
                      bool isIgnoredDir = ignoreRules.Any(r => subDir.FullName.StartsWith(r.Path, StringComparison.OrdinalIgnoreCase));
+                     if (isIgnoredDir) continue;
                      
-                     string driveRoot = Path.GetPathRoot(subDir.FullName) ?? "";
-                     await _dbService.AddDirectoryToScanQueueAsync(subDir.FullName, driveRoot);
+                     foundSubDirs.Add(subDir.FullName);
                  }
 
                  // 2. Process Files
                  System.Collections.Generic.List<string> filePaths = new();
                  foreach (var file in directory.EnumerateFiles("*", enumOptions))
                  {
-                     if (cancellationToken.IsCancellationRequested) return;
+                     if (cancellationToken.IsCancellationRequested) return foundSubDirs;
                      filePaths.Add(file.FullName);
                  }
 
                  foreach (var filePath in filePaths)
                  {
+                     _scannedFilesCount++; // Increment tally
+                     
                      var file = new FileInfo(filePath);
                      var existingEntry = await _dbService.GetFileEntryAsync(filePath);
                      bool needsHashing = true;
@@ -204,6 +254,10 @@ namespace SecureFileMonitor.Core.Services
 
                      if (needsHashing)
                      {
+                         // Optional: detailed file progress (might be too spammy, but useful for debugging hang)
+                         if (file.Length > 10 * 1024 * 1024) // Only for files > 10MB
+                            progress?.Report(($"Hashing {file.Name}...", null, null, _scannedFilesCount));
+
                          if (file.Length > 50 * 1024 * 1024)
                          {
                              _largeFileHashQueue.Enqueue(filePath);
@@ -222,14 +276,22 @@ namespace SecureFileMonitor.Core.Services
                              LastModified = file.LastWriteTimeUtc,
                              CurrentHash = newHash 
                          };
-                         await _dbService.SaveFileEntryAsync(entry);
+                         
+                         _fileWriteBuffer.Add(entry);
+                         if (_fileWriteBuffer.Count >= _batchSize)
+                         {
+                             await FlushBufferAsync();
+                         }
                      }
                  }
             }
             catch (Exception ex) 
             {
                 _logger.LogError($"Failed dir scan {directory.FullName}: {ex.Message}");
+                throw; // Rethrow to be caught by batch loop for logging context
             }
+            
+            return foundSubDirs;
         }
 
         // Keep Background Hashing Logic same...
@@ -301,6 +363,17 @@ namespace SecureFileMonitor.Core.Services
             }
             
             progress?.Report(("Background hashing complete.", 0, total, null));
+        }
+
+        private async Task FlushBufferAsync()
+        {
+            if (_fileWriteBuffer.Count > 0)
+            {
+                // Create copy to pass to DB to avoid modification during await if we were parallel (we aren't here but safety first)
+                var batch = _fileWriteBuffer.ToList();
+                _fileWriteBuffer.Clear();
+                await _dbService.SaveFileEntriesBatchAsync(batch);
+            }
         }
 
         private async Task CheckForDeletedFilesAsync(string driveLetter, System.Collections.Generic.HashSet<string> foundFiles, System.Collections.Generic.List<IgnoreRule> ignoreRules)

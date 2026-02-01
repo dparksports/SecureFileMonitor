@@ -6,7 +6,7 @@ namespace SecureFileMonitor.Core.Services
 {
     public interface IFileScannerService
     {
-        Task ScanDriveAsync(string driveLetter, bool scanReparseFolders, bool skipWindows, bool skipProgramFiles, bool skipRecycleBin, bool forceFullScan, IProgress<(string Status, double? Percent, TimeSpan? ETA)> progress, CancellationToken cancellationToken);
+        Task ScanDriveAsync(string driveLetter, bool scanReparseFolders, bool skipWindows, bool skipProgramFiles, bool skipRecycleBin, bool forceFullScan, IProgress<(string Status, double? Percent, TimeSpan? ETA, int? ScannedCount)> progress, CancellationToken cancellationToken);
         
         // Background Hashing for Large Files
         event EventHandler<(int Remaining, int Total, TimeSpan? ETA)>? OnHashProgressChanged;

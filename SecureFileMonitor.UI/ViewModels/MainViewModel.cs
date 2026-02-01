@@ -15,6 +15,8 @@ namespace SecureFileMonitor.UI.ViewModels
 {
     public partial class MainViewModel : ObservableObject
     {
+        private const int MAX_VISIBLE_FILES = 2000;
+        private List<FileEntry> _fullFilteredList = new();
         private readonly IUsnJournalService _usnService;
         private readonly IEtwMonitorService _etwService;
         private readonly IDatabaseService _dbService;
@@ -194,6 +196,10 @@ namespace SecureFileMonitor.UI.ViewModels
         [ObservableProperty]
         private string _hashETA = "";
 
+        // Real-time Scan Count
+        [ObservableProperty]
+        private int _scannedFilesCount;
+
         [ObservableProperty]
         private bool _skipWindows = false;
 
@@ -216,6 +222,24 @@ namespace SecureFileMonitor.UI.ViewModels
         async partial void OnSkipRecycleBinChanged(bool value)
         {
              try { await _dbService.SaveSettingAsync("SkipRecycleBin", value.ToString()); } catch { /* Ignore */ }
+        }
+
+        [ObservableProperty]
+        private int _scanBatchSize = 10000;
+
+        async partial void OnScanBatchSizeChanged(int value)
+        {
+             if (value < 100) value = 100; // Minimum check
+             try { await _dbService.SaveSettingAsync("ScanBatchSize", value.ToString()); } catch { /* Ignore */ }
+        }
+
+        [ObservableProperty]
+        private int _directoryBatchSize = 100;
+
+        async partial void OnDirectoryBatchSizeChanged(int value)
+        {
+             if (value < 10) value = 10; // Minimum check
+             try { await _dbService.SaveSettingAsync("DirectoryBatchSize", value.ToString()); } catch { /* Ignore */ }
         }
 
         // Sorting
@@ -435,11 +459,30 @@ namespace SecureFileMonitor.UI.ViewModels
 
                 System.Windows.Application.Current.Dispatcher.Invoke(() =>
                 {
+                    _fullFilteredList = filteredList;
                     // Optimization: Replace the collection entirely to avoid O(N) CollectionChanged events
-                    FilteredFiles = new ObservableCollection<FileEntry>(filteredList);
-                    UpdateSelectionTally(FilteredFiles);
+                    FilteredFiles = new ObservableCollection<FileEntry>(_fullFilteredList.Take(MAX_VISIBLE_FILES));
+                    UpdateSelectionTally(_fullFilteredList); // Tally based on ALL results, not just visible
+                    OnPropertyChanged(nameof(HasMoreFiles));
                 });
             });
+        }
+
+        public bool HasMoreFiles => FilteredFiles.Count < _fullFilteredList.Count;
+
+        [RelayCommand]
+        private void LoadMoreFiles()
+        {
+            if (!HasMoreFiles) return;
+
+            var currentCount = FilteredFiles.Count;
+            var nextBatch = _fullFilteredList.Skip(currentCount).Take(MAX_VISIBLE_FILES).ToList();
+            
+            foreach (var file in nextBatch)
+            {
+                FilteredFiles.Add(file);
+            }
+            OnPropertyChanged(nameof(HasMoreFiles));
         }
 
 
@@ -561,6 +604,14 @@ namespace SecureFileMonitor.UI.ViewModels
         [ObservableProperty]
         private bool _verifyGpuHash = false; // Default off, requires UseGpu
 
+        [ObservableProperty]
+        private bool _forceRescan = false;
+
+        async partial void OnForceRescanChanged(bool value)
+        {
+             try { await _dbService.SaveSettingAsync("ForceRescan", value.ToString()); } catch { /* Ignore */ }
+        }
+
         // GPU Availability
         [ObservableProperty]
         private bool _isGpuAvailable; // Set in constructor
@@ -670,12 +721,39 @@ namespace SecureFileMonitor.UI.ViewModels
         }
 
         [RelayCommand]
+        public async Task ClearScanQueue()
+        {
+            if (IsScanning) 
+            {
+                StatusMessage = "Cannot clear queue while scanning.";
+                return;
+            }
+
+            try
+            {
+                StatusMessage = "Clearing pending scan tasks...";
+                await _dbService.ClearScanQueueAsync();
+                
+                // Reset Pause State
+                IsPaused = false; 
+                _scannerService.SetPaused(false);
+                await _dbService.SaveSettingAsync("IsPaused", "false");
+
+                StatusMessage = "Scan queue cleared. Ready.";
+            }
+            catch (Exception ex)
+            {
+                StatusMessage = $"Error clearing queue: {ex.Message}";
+            }
+        }
+
+        [RelayCommand]
         public async Task LoadAllFiles()
         {
              StatusMessage = "Loading files...";
              var filesList = (await _dbService.GetAllFilesAsync()).ToList();
              
-             StatusMessage = $"Processing {filesList.Count} files...";
+             StatusMessage = $"Organizing {filesList.Count} files...";
 
         // Capture current state on UI thread before background task
         var currentSelection = ExtensionChips.Where(c => c.IsChecked).Select(c => c.Extension).ToHashSet();
@@ -707,8 +785,10 @@ namespace SecureFileMonitor.UI.ViewModels
                 ActivityStats = new ObservableCollection<ActivitySession>(timeline);
 
                 // Initial Filter pass
-                FilteredFiles = new ObservableCollection<FileEntry>(filesList);
-                UpdateSelectionTally(FilteredFiles);
+                _fullFilteredList = filesList;
+                FilteredFiles = new ObservableCollection<FileEntry>(_fullFilteredList.Take(MAX_VISIBLE_FILES));
+                UpdateSelectionTally(_fullFilteredList);
+                OnPropertyChanged(nameof(HasMoreFiles));
             });
         });
         
@@ -744,6 +824,7 @@ namespace SecureFileMonitor.UI.ViewModels
                 string? skipWindowsVal = await _dbService.GetSettingAsync("SkipWindows");
                 string? skipProgramFilesVal = await _dbService.GetSettingAsync("SkipProgramFiles");
                 string? skipRecycleBinVal = await _dbService.GetSettingAsync("SkipRecycleBin");
+                string? dirBatchSizeVal = await _dbService.GetSettingAsync("DirectoryBatchSize");
 
                 UseGpu = bool.TryParse(useGpuVal, out bool g) && g;
                 UseThreads = bool.TryParse(useThreadsVal, out bool t) && t;
@@ -752,6 +833,16 @@ namespace SecureFileMonitor.UI.ViewModels
                 SkipProgramFiles = bool.TryParse(skipProgramFilesVal, out bool sp) && sp;
                 // Default SkipRecycleBin to true if null
                 SkipRecycleBin = skipRecycleBinVal == null ? true : (bool.TryParse(skipRecycleBinVal, out bool srb) && srb);
+                if (int.TryParse(dirBatchSizeVal, out int dBatch) && dBatch > 0) DirectoryBatchSize = dBatch;
+
+                string? forceRescanVal = await _dbService.GetSettingAsync("ForceRescan");
+                if (bool.TryParse(forceRescanVal, out bool fr)) 
+                {
+                    await System.Windows.Application.Current.Dispatcher.InvokeAsync(() => ForceRescan = fr);
+                }
+                
+                // Override isFullScan if ForceRescan is checked
+                if (ForceRescan) isFullScan = true;
                 
                 // Restore Pause State
                 if (bool.TryParse(isPausedVal, out bool p) && p)
@@ -779,17 +870,12 @@ namespace SecureFileMonitor.UI.ViewModels
 
                 StatusMessage = $"{modeName}: Scanning {selectedDrives.Count} drives...";
                 
-                var progress = new Progress<(string Status, double? Percent, TimeSpan? ETA)>(val => 
+                var progress = new Progress<(string Status, double? Percent, TimeSpan? ETA, int? ScannedCount)>(update =>
                 {
-                     StatusMessage = val.Status;
-                     if (val.ETA.HasValue)
-                     {
-                        ScanETA = $"ETA: {val.ETA.Value.Hours:D2}:{val.ETA.Value.Minutes:D2}:{val.ETA.Value.Seconds:D2}";
-                     }
-                     else 
-                     {
-                        ScanETA = "";
-                     }
+                    if (update.Status != null) StatusMessage = update.Status;
+                    // if (update.Percent.HasValue) ScanProgress = update.Percent.Value; // Removed: No ScanProgress property
+                    if (update.ETA.HasValue) ScanETA = $"ETA: {update.ETA.Value:mm\\:ss}";
+                    if (update.ScannedCount.HasValue) ScannedFilesCount = update.ScannedCount.Value;
                 });
 
                 foreach (var drive in selectedDrives)
@@ -1370,6 +1456,7 @@ namespace SecureFileMonitor.UI.ViewModels
 
         private async Task InitializeAsync()
         {
+            await LoadDrives();
             await LoadAllFiles();
             await RefreshIgnoreList();
             await LoadTranscriptionHistory();
