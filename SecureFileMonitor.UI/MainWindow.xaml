@@ -70,6 +70,209 @@
             </Setter>
         </Style>
 
+        <HierarchicalDataTemplate x:Key="FolderTreeTemplate" ItemsSource="{Binding Children}">
+            <StackPanel Orientation="Horizontal">
+                <TextBlock Text="📁" Margin="0,0,5,0" Foreground="Goldenrod"/>
+                <TextBlock Text="{Binding Name}" FontWeight="SemiBold"/>
+                <TextBlock Text="{Binding FileCount, StringFormat=' ({0})'}" Foreground="Gray" FontSize="10" VerticalAlignment="Center" Margin="5,0,0,0"/>
+            </StackPanel>
+        </HierarchicalDataTemplate>
+
+        <CollectionViewSource x:Key="GroupedFilesSource" Source="{Binding FilteredFiles}">
+            <CollectionViewSource.GroupDescriptions>
+                <PropertyGroupDescription PropertyName="DirectoryName"/> <!-- Assumes FileEntry has DirectoryName or we use FilePath and converter? FileEntry has FilePath. We need a property or Converter. -->
+            </CollectionViewSource.GroupDescriptions>
+        </CollectionViewSource>
+
+        <!-- Timeline Template -->
+        <DataTemplate x:Key="TimelineItemTemplate">
+            <Border Width="12" VerticalAlignment="Bottom" Margin="1,0" ToolTip="{Binding Tooltip}">
+                <Border.Height>
+                    <Binding Path="Intensity">
+                        <Binding.Converter>
+                             <conv:ViewToVisibilityConverter/>
+                        </Binding.Converter>
+                    </Binding>
+                </Border.Height>
+                <Border.Background>
+                    <SolidColorBrush Color="SpringGreen" Opacity="{Binding Intensity}"/>
+                </Border.Background>
+                <Border.Style>
+                    <Style TargetType="Border">
+                        <Setter Property="Height" Value="{Binding FileCount}"/>
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                                <Setter Property="BorderBrush" Value="White"/>
+                                <Setter Property="BorderThickness" Value="1"/>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Border.Style>
+            </Border>
+        </DataTemplate>
+
+        <!-- Modern UI Resources -->
+        <Style x:Key="HeroButtonStyle" TargetType="Button">
+            <Setter Property="Background" Value="#1E1E1E"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="Height" Value="180"/>
+            <Setter Property="Margin" Value="10"/>
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="border" Background="{TemplateBinding Background}" CornerRadius="15" BorderThickness="1" BorderBrush="#333">
+                            <Border.Effect>
+                                <DropShadowEffect Color="Black" BlurRadius="20" ShadowDepth="5" Opacity="0.5"/>
+                            </Border.Effect>
+                            <Grid>
+                                <Border x:Name="glow" Background="Transparent" CornerRadius="15" BorderThickness="2" BorderBrush="{StaticResource CyberpunkGreenBrush}" Opacity="0"/>
+                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </Grid>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="border" Property="Background" Value="#252525"/>
+                                <Setter TargetName="glow" Property="Opacity" Value="1"/>
+                                <Setter TargetName="glow" Property="BorderBrush" Value="#00FF7F"/>
+                                <Setter TargetName="glow" Property="Effect">
+                                    <Setter.Value>
+                                        <DropShadowEffect Color="#00FF7F" BlurRadius="15" ShadowDepth="0" Opacity="0.6"/>
+                                    </Setter.Value>
+                                </Setter>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.5"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="ModernToggleStyle" TargetType="CheckBox">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="CheckBox">
+                        <Border Background="#252525" CornerRadius="8" Padding="15" Margin="0,0,0,10" BorderBrush="#333" BorderThickness="1">
+                             <VisualStateManager.VisualStateGroups>
+                                <VisualStateGroup x:Name="CheckStates">
+                                    <VisualState x:Name="Checked">
+                                        <Storyboard>
+                                            <DoubleAnimation Storyboard.TargetName="KnobTranslate" Storyboard.TargetProperty="X" To="24" Duration="0:0:0.2"/>
+                                            <ColorAnimation Storyboard.TargetName="Track" Storyboard.TargetProperty="(Border.Background).(SolidColorBrush.Color)" To="#00FF7F" Duration="0:0:0.2"/>
+                                        </Storyboard>
+                                    </VisualState>
+                                    <VisualState x:Name="Unchecked">
+                                        <Storyboard>
+                                            <DoubleAnimation Storyboard.TargetName="KnobTranslate" Storyboard.TargetProperty="X" To="0" Duration="0:0:0.2"/>
+                                            <ColorAnimation Storyboard.TargetName="Track" Storyboard.TargetProperty="(Border.Background).(SolidColorBrush.Color)" To="#444" Duration="0:0:0.2"/>
+                                        </Storyboard>
+                                    </VisualState>
+                                </VisualStateGroup>
+                            </VisualStateManager.VisualStateGroups>
+                            <DockPanel LastChildFill="False">
+                                <StackPanel DockPanel.Dock="Left" VerticalAlignment="Center">
+                                    <ContentPresenter Content="{TemplateBinding Content}" TextElement.FontWeight="Bold"/>
+                                    <TextBlock Text="{TemplateBinding Tag}" Foreground="Gray" FontSize="11" Margin="0,2,0,0" TextWrapping="Wrap" MaxWidth="300"/>
+                                </StackPanel>
+                                <Border DockPanel.Dock="Right" x:Name="Track" Width="50" Height="26" CornerRadius="13" Background="#444">
+                                    <Ellipse Width="22" Height="22" Fill="White" HorizontalAlignment="Left" Margin="2,0,0,0">
+                                        <Ellipse.RenderTransform>
+                                            <TranslateTransform x:Name="KnobTranslate" X="0"/>
+                                        </Ellipse.RenderTransform>
+                                    </Ellipse>
+                                </Border>
+                            </DockPanel>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <DataTemplate x:Key="DriveCardTemplate">
+            <Border Background="#1E1E1E" CornerRadius="8" Padding="15" Margin="0,0,0,10" BorderBrush="#333" BorderThickness="1">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    
+                    <CheckBox IsChecked="{Binding IsSelected}" VerticalAlignment="Center" Margin="0,0,15,0">
+                        <CheckBox.LayoutTransform>
+                            <ScaleTransform ScaleX="1.5" ScaleY="1.5"/>
+                        </CheckBox.LayoutTransform>
+                    </CheckBox>
+                    
+                    <Grid Grid.Column="1">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+                        
+                        <DockPanel Grid.Row="0" LastChildFill="False" Margin="0,0,0,8">
+                            <StackPanel Orientation="Horizontal" DockPanel.Dock="Left">
+                                <TextBlock Text="{Binding Name}" FontWeight="Bold" Foreground="White" FontSize="16"/>
+                                <TextBlock Text="{Binding Label, StringFormat=' ({0})'}" Foreground="#AAA" FontSize="16" Margin="5,0,0,0"/>
+                            </StackPanel>
+                            <TextBlock DockPanel.Dock="Right" Foreground="#AAA" FontSize="12" VerticalAlignment="Bottom">
+                                <Run Text="{Binding UsagePercentage, StringFormat={}{0:0}%, Mode=OneWay}" Foreground="{StaticResource CyberpunkGreenBrush}" FontWeight="Bold"/>
+                                <Run Text=" used"/>
+                            </TextBlock>
+                        </DockPanel>
+                        
+                        <ProgressBar Grid.Row="1" Height="6" Value="{Binding UsagePercentage, Mode=OneWay}" Maximum="100" 
+                                     Background="#333" Foreground="{StaticResource CyberpunkGreenBrush}" BorderThickness="0" Margin="0,0,0,8"/>
+                        
+                        <DockPanel Grid.Row="2" LastChildFill="False">
+                            <TextBlock DockPanel.Dock="Left" Text="Healthy" Foreground="{StaticResource CyberpunkGreenBrush}" FontSize="11">
+                                <Run Text=" • Ready" Foreground="#666"/>
+                            </TextBlock>
+                            <TextBlock DockPanel.Dock="Right" Foreground="#666" FontSize="11">
+                                <Run Text="{Binding TotalSize, Mode=OneWay}"/>
+                                <Run Text=" total"/>
+                            </TextBlock>
+                        </DockPanel>
+                    </Grid>
+                </Grid>
+            </Border>
+        </DataTemplate>
+
+        <Style x:Key="SidebarButtonStyle" TargetType="Button">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="3,0,0,0"/>
+            <Setter Property="Height" Value="75"/>
+            <Setter Property="Margin" Value="0,0,0,5"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}" 
+                                BorderBrush="{TemplateBinding BorderBrush}" 
+                                BorderThickness="{TemplateBinding BorderThickness}">
+                            <Grid>
+                                    <!-- Active Indicator Glow (Optional) -->
+                                <Border Background="{TemplateBinding BorderBrush}" Opacity="0.1" HorizontalAlignment="Stretch" VerticalAlignment="Stretch"/>
+                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </Grid>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter Property="Background" Value="#11FFFFFF"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.3"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
     </Window.Resources>
 
     <Grid>
@@ -81,63 +284,82 @@
 
 
         <!-- Main Content -->
-        <Grid Grid.Row="0" Margin="20,15">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="90"/>
-                <ColumnDefinition Width="*"/>
-            </Grid.ColumnDefinitions>
-
-            <!-- Sidebar -->
-            <Grid Grid.Column="0" Margin="0,0,10,0" Background="{StaticResource NavyBackgroundBrush}">
+        <Grid Grid.Row="0"> 
                 <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="*"/>
-                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="60"/> <!-- Header -->
+                    <RowDefinition Height="*"/>  <!-- Main Content Row -->
                 </Grid.RowDefinitions>
 
-                <Grid.Resources>
-                    <Style x:Key="SidebarButtonStyle" TargetType="Button">
-                        <Setter Property="Background" Value="Transparent"/>
-                        <Setter Property="BorderThickness" Value="3,0,0,0"/>
-                        <Setter Property="Height" Value="75"/>
-                        <Setter Property="Margin" Value="0,0,0,5"/>
-                        <Setter Property="Cursor" Value="Hand"/>
-                        <Setter Property="Template">
-                            <Setter.Value>
-                                <ControlTemplate TargetType="Button">
-                                    <Border Background="{TemplateBinding Background}" 
-                                            BorderBrush="{TemplateBinding BorderBrush}" 
-                                            BorderThickness="{TemplateBinding BorderThickness}">
-                                        <Grid>
-                                             <!-- Active Indicator Glow (Optional) -->
-                                            <Border Background="{TemplateBinding BorderBrush}" Opacity="0.1" HorizontalAlignment="Stretch" VerticalAlignment="Stretch"/>
-                                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                        </Grid>
-                                    </Border>
-                                    <ControlTemplate.Triggers>
-                                        <Trigger Property="IsMouseOver" Value="True">
-                                             <Setter Property="Background" Value="#11FFFFFF"/>
-                                        </Trigger>
-                                        <Trigger Property="IsEnabled" Value="False">
-                                            <Setter Property="Opacity" Value="0.3"/>
-                                        </Trigger>
-                                    </ControlTemplate.Triggers>
-                                </ControlTemplate>
-                            </Setter.Value>
-                        </Setter>
-                    </Style>
-                </Grid.Resources>
+                <!-- Header -->
+                <Grid Grid.Row="0" Background="#181818" Margin="20,0,20,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    
+                    <!-- Branding (Top Left) -->
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <Border Width="32" Height="32" Margin="0,0,10,0">
+                            <Border.Effect>
+                                <DropShadowEffect Color="#00FF7F" BlurRadius="10" ShadowDepth="0" Opacity="0.8"/>
+                            </Border.Effect>
+                            <!-- Shield Icon: Changed from E771 to E83D (Defender Shield) -->
+                            <TextBlock Text="&#xE83D;" FontFamily="Segoe MDL2 Assets" FontSize="24" Foreground="{StaticResource CyberpunkGreenBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <TextBlock Text="Secure File Monitor" FontSize="18" FontWeight="Bold" Foreground="White" VerticalAlignment="Center"/>
+                    </StackPanel>
 
-                <!-- Branding -->
-                <StackPanel Grid.Row="0" Margin="0,20,0,30" HorizontalAlignment="Center">
-                     <TextBlock Text="&#xE771;" FontFamily="Segoe MDL2 Assets" FontSize="24" Foreground="{StaticResource CyanAccentBrush}" HorizontalAlignment="Center" Margin="0,0,0,8"/>
-                     <TextBlock Text="SECURE" FontSize="10" FontWeight="Bold" Foreground="{StaticResource CyanAccentBrush}" HorizontalAlignment="Center"/>
-                     <TextBlock Text="FILES" FontSize="10" FontWeight="Bold" Foreground="{StaticResource CyanAccentBrush}" HorizontalAlignment="Center"/>
-                </StackPanel>
+                    <!-- Utility Icons (Top Right) -->
+                    <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                        <Button Style="{DynamicResource SidebarButtonStyle}" Width="40" Height="40" Margin="0,0,10,0" ToolTip="Notifications">
+                             <!-- Bell Icon: Changed from E7E7 (Bubble) to EA8F (Ringer) -->
+                             <TextBlock Text="&#xEA8F;" FontFamily="Segoe MDL2 Assets" FontSize="18" Foreground="#AAA"/>
+                        </Button>
+                        <Button Command="{Binding SwitchViewCommand}" CommandParameter="SETTINGS"
+                                Style="{DynamicResource SidebarButtonStyle}" Width="40" Height="40" Margin="0,0,10,0" ToolTip="Settings"
+                                BorderBrush="{Binding CurrentViewName, Converter={StaticResource ViewToColorConverter}, ConverterParameter=SETTINGS}"
+                                Foreground="{Binding CurrentViewName, Converter={StaticResource ViewToForegroundConverter}, ConverterParameter=SETTINGS}">
+                             <TextBlock Text="&#xE713;" FontFamily="Segoe MDL2 Assets" FontSize="18"/>
+                        </Button>
+                        <Border Width="36" Height="36" CornerRadius="18" BorderThickness="2" BorderBrush="{StaticResource CyberpunkGreenBrush}" Margin="10,0,0,0">
+                             <TextBlock Text="&#xE77B;" FontFamily="Segoe MDL2 Assets" FontSize="18" Foreground="#888" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                    </StackPanel>
+                </Grid>
+
+                <!-- Main Content Area (Sidebar + Feature View) -->
+                <Grid Grid.Row="1" Margin="20,0,20,15">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="90"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <!-- Sidebar -->
+                    <Grid Grid.Column="0" Margin="0,0,10,0" Background="{StaticResource NavyBackgroundBrush}">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="*"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+
+
+
+                <!-- Branding removed from sidebar (moved to header) -->
 
                 <!-- Navigation -->
-                <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Hidden">
+                <ScrollViewer Grid.Row="0" VerticalScrollBarVisibility="Hidden">
                     <StackPanel>
+                        <!-- Scan -->
+                        <Button Command="{Binding SwitchViewCommand}" CommandParameter="SCAN"
+                                Style="{DynamicResource SidebarButtonStyle}"
+                                BorderBrush="{Binding CurrentViewName, Converter={StaticResource ViewToColorConverter}, ConverterParameter=SCAN}"
+                                Foreground="{Binding CurrentViewName, Converter={StaticResource ViewToForegroundConverter}, ConverterParameter=SCAN}">
+                            <StackPanel>
+                                <TextBlock Text="&#xE768;" FontFamily="Segoe MDL2 Assets" FontSize="20" HorizontalAlignment="Center" Margin="0,0,0,5"/>
+                                <TextBlock Text="SCAN" FontSize="9" FontWeight="SemiBold" HorizontalAlignment="Center"/>
+                            </StackPanel>
+                        </Button>
+
                         <!-- Dashboard / Vault -->
                         <Button Command="{Binding SwitchViewCommand}" CommandParameter="VAULT"
                                 Style="{StaticResource SidebarButtonStyle}"
@@ -188,7 +410,7 @@
                 </ScrollViewer>
 
                 <!-- Footer Navigation -->
-                <StackPanel Grid.Row="2" Margin="0,10,0,20">
+                <StackPanel Grid.Row="1" Margin="0,10,0,20">
                     <Border Height="1" Background="#333" Margin="10,0,10,15"/>
                     
                      <!-- Inspect / Ignore -->
@@ -220,6 +442,112 @@
             <!-- Main Content Area -->
             <Border Grid.Column="1" Background="#11FFFFFF" CornerRadius="8" Padding="10">
                 <Grid>
+                    <Grid Visibility="{Binding CurrentViewName, Converter={StaticResource ViewToVisibilityConverter}, ConverterParameter=SCAN}">
+                        <ScrollViewer VerticalScrollBarVisibility="Auto">
+                            <StackPanel Margin="30">
+                                <!-- Breadcrumb -->
+                                <TextBlock Text="Dashboard > Scan" Foreground="Gray" Margin="0,0,0,20"/>
+                                
+                                <!-- Hero Section -->
+                                <Grid Margin="0,0,0,40">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    
+                                    <!-- Scan New Button -->
+                                    <Button Grid.Column="0" Command="{Binding ScanNewFilesCommand}" Style="{StaticResource HeroButtonStyle}"
+                                            IsEnabled="{Binding IsScanning, Converter={StaticResource InverseBooleanConverter}}">
+                                        <StackPanel HorizontalAlignment="Center">
+                                            <TextBlock Text="📂" FontSize="40" HorizontalAlignment="Center" Margin="0,0,0,15" Foreground="{StaticResource CyberpunkGreenBrush}"/>
+                                            <TextBlock Text="Quick Scan" FontSize="24" FontWeight="Bold" HorizontalAlignment="Center" Margin="0,0,0,5"/>
+                                            <TextBlock Text="Fast scan on critical paths and new files." FontSize="12" Foreground="#AAA" HorizontalAlignment="Center"/>
+                                        </StackPanel>
+                                    </Button>
+
+                                    <!-- Full Scan Button -->
+                                    <Button Grid.Column="1" Command="{Binding FullScanCommand}" Style="{StaticResource HeroButtonStyle}"
+                                            IsEnabled="{Binding IsScanning, Converter={StaticResource InverseBooleanConverter}}">
+                                        <StackPanel HorizontalAlignment="Center">
+                                            <TextBlock Text="🔍" FontSize="40" HorizontalAlignment="Center" Margin="0,0,0,15" Foreground="{StaticResource CyberpunkGreenBrush}"/>
+                                            <TextBlock Text="Full Scan" FontSize="24" FontWeight="Bold" HorizontalAlignment="Center" Margin="0,0,0,5"/>
+                                            <TextBlock Text="Comprehensive scan of all drives." FontSize="12" Foreground="#AAA" HorizontalAlignment="Center"/>
+                                        </StackPanel>
+                                    </Button>
+                                </Grid>
+                                
+                                <!-- Active Scan Controls (Visible only when scanning) -->
+                                <Border Visibility="{Binding IsScanning, Converter={StaticResource BooleanToVisibilityConverter}}" 
+                                        Background="#1E1E1E" CornerRadius="10" Padding="20" Margin="0,0,0,40"
+                                        BorderBrush="{StaticResource CyberpunkGreenBrush}" BorderThickness="1">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel>
+                                            <TextBlock Text="SCAN IN PROGRESS..." Foreground="{StaticResource CyberpunkGreenBrush}" FontWeight="Bold" FontSize="18" Margin="0,0,0,5"/>
+                                            <TextBlock Text="{Binding StatusMessage}" Foreground="#DDD"/>
+                                            <TextBlock Text="{Binding ScanETA}" Foreground="Gray" Margin="0,5,0,0"/>
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="1" Orientation="Horizontal">
+                                             <Button Command="{Binding PauseScanCommand}" Content="⏸ PAUSE" Width="100" Height="40"
+                                                     Background="Orange" Foreground="Black" FontWeight="Bold" Margin="0,0,10,0" Style="{StaticResource DarkButtonStyle}"
+                                                     Visibility="{Binding IsPaused, Converter={StaticResource BooleanToVisibilityConverter}, ConverterParameter=INVERSE}"/>
+                                             <Button Command="{Binding ResumeScanCommand}" Content="▶ RESUME" Width="100" Height="40"
+                                                     Background="{StaticResource CyberpunkGreenBrush}" Foreground="Black" FontWeight="Bold" Margin="0,0,10,0" Style="{StaticResource DarkButtonStyle}"
+                                                     Visibility="{Binding IsPaused, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                                             <Button Command="{Binding StopScanCommand}" Content="⏹ STOP" Width="100" Height="40"
+                                                     Background="#FF4444" Foreground="White" FontWeight="Bold" Style="{StaticResource DarkButtonStyle}"/>
+                                        </StackPanel>
+                                    </Grid>
+                                </Border>
+
+                                <!-- Main Columns -->
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="5*"/>
+                                        <ColumnDefinition Width="30"/> <!-- Spacer -->
+                                        <ColumnDefinition Width="4*"/>
+                                    </Grid.ColumnDefinitions>
+
+                                    <!-- Left: Target Drives -->
+                                    <StackPanel Grid.Column="0">
+                                        <TextBlock Text="Target Drives" FontSize="18" FontWeight="SemiBold" Foreground="White" Margin="0,0,0,15"/>
+                                        
+                                        <!-- Actions -->
+                                        <Button Command="{Binding LoadDrivesCommand}" Content="🔄 Refresh List" 
+                                                HorizontalAlignment="Right" Margin="0,-35,0,0"
+                                                Background="Transparent" BorderThickness="0" Foreground="#888"/>
+                                                
+                                        <ItemsControl ItemsSource="{Binding AvailableDrives}" ItemTemplate="{StaticResource DriveCardTemplate}"/>
+                                    </StackPanel>
+
+                                    <!-- Right: Scan Options -->
+                                    <StackPanel Grid.Column="2">
+                                        <TextBlock Text="Scan Options" FontSize="18" FontWeight="SemiBold" Foreground="White" Margin="0,0,0,15"/>
+                                        
+                                        <CheckBox Style="{StaticResource ModernToggleStyle}" IsChecked="{Binding UseThreads}" Content="Multi-threading" 
+                                                  Tag="Enable faster scanning using multiple CPU cores."/>
+                                                  
+                                        <CheckBox Style="{StaticResource ModernToggleStyle}" IsChecked="{Binding SkipWindows}" Content="Skip System Files" 
+                                                  Tag="Exclude Windows directory to speed up scanning."/>
+                                                  
+                                        <CheckBox Style="{StaticResource ModernToggleStyle}" IsChecked="{Binding SkipProgramFiles}" Content="Skip Program Files" 
+                                                  Tag="Exclude installed applications folders."/>
+                                                  
+                                        <CheckBox Style="{StaticResource ModernToggleStyle}" IsChecked="{Binding SkipRecycleBin}" Content="Skip Recycle Bin" 
+                                                  Tag="Ignore deleted files in the Recycle Bin."/>
+                                        
+                                         <CheckBox Style="{StaticResource ModernToggleStyle}" IsChecked="{Binding VerifyGpuHash}" Content="GPU Hash Verification" 
+                                                  Tag="Use advanced GPU acceleration to verify file integrity (Experimental)."
+                                                  Visibility="{Binding UseGpu, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                                    </StackPanel>
+                                </Grid>
+                            </StackPanel>
+                        </ScrollViewer>
+                    </Grid>
+
                     <!-- VAULT View -->
                     <Grid Visibility="{Binding CurrentViewName, Converter={StaticResource ViewToVisibilityConverter}, ConverterParameter=VAULT}">
                         <Grid.RowDefinitions>
@@ -236,96 +564,15 @@
                             
                             <StackPanel>
                                 <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
-                                    <Button Command="{Binding ScanNewFilesCommand}" Content="📂 Scan New" 
-                                            Style="{StaticResource DarkButtonStyle}" Margin="0,0,5,0"
-                                            IsEnabled="{Binding IsScanning, Converter={StaticResource InverseBooleanConverter}}"/>
-                                    
-                                    <Button Command="{Binding FullScanCommand}" Content="🔎 Scan Full" 
-                                            Style="{StaticResource DarkButtonStyle}" Margin="0,0,5,0"
-                                            IsEnabled="{Binding IsScanning, Converter={StaticResource InverseBooleanConverter}}"/>
-                                    
-                                    <!-- Scan Control Buttons -->
-                                    <StackPanel Orientation="Horizontal" Visibility="{Binding IsScanning, Converter={StaticResource BooleanToVisibilityConverter}}">
-                                        <Button Command="{Binding PauseScanCommand}" Content="⏸️ Pause" 
-                                                Background="Orange" Foreground="Black" Padding="10,5" Margin="0,0,5,0"
-                                                Visibility="{Binding IsPaused, Converter={StaticResource BooleanToVisibilityConverter}, ConverterParameter=INVERSE}"/>
-                                                
-                                        <Button Command="{Binding ResumeScanCommand}" Content="▶️ Resume" 
-                                                Background="SpringGreen" Foreground="Black" Padding="10,5" Margin="0,0,5,0"
-                                                Visibility="{Binding IsPaused, Converter={StaticResource BooleanToVisibilityConverter}}"/>
-                                        
-                                        <Button Command="{Binding StopScanCommand}" Content="⏹️ Stop" 
-                                                Background="#8B0000" Foreground="White" Padding="10,5" Margin="0,0,10,0"/>
-                                    </StackPanel>
-
                                     <Button Command="{Binding LoadAllFilesCommand}" Content="📋 Refresh List" 
                                             Background="#333" Foreground="White" Padding="10,5" Margin="0,0,10,0"/>
                                     
-                                    <ToggleButton x:Name="OptionsToggle" Content="⚙️ Settings" 
-                                                  Background="#333" Foreground="White" Padding="10,5" Margin="0,0,10,0"/>
-
-                                    <Separator Width="1" Background="#333" Margin="5,0"/>
-
-
-
                                     <ToggleButton IsChecked="{Binding IsFileDetailsVisible}" Content="ℹ️ Details" 
                                                   Background="{Binding IsFileDetailsVisible, Converter={StaticResource ViewToColorConverter}, ConverterParameter=TRUE}" 
-                                                  Foreground="White" Padding="10,5" Margin="10,0,0,0"/>
+                                                  Foreground="White" Padding="10,5" Margin="0,0,0,0"/>
 
                                     <CheckBox IsChecked="{Binding EnableIgnoreList}" Content="Filter Ignored" VerticalAlignment="Center" Foreground="White" FontWeight="SemiBold" Margin="10,0,0,0"/>
                                 </StackPanel>
-                                
-                                <!-- Scan Options Panel -->
-                                <Border Background="#222" CornerRadius="4" Padding="10" Margin="0,0,0,10"
-                                        Visibility="{Binding IsChecked, ElementName=OptionsToggle, Converter={StaticResource BooleanToVisibilityConverter}}">
-                                    <Grid>
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="Auto"/>
-                                            <ColumnDefinition Width="*"/>
-                                        </Grid.ColumnDefinitions>
-                                        
-                                        <!-- Drive Selection -->
-                                        <StackPanel Grid.Column="0" Margin="0,0,20,0">
-                                            <TextBlock Text="SELECT DRIVES:" FontWeight="Bold" Foreground="Gray" Margin="0,0,0,5"/>
-                                            <Border BorderBrush="#444" BorderThickness="1" Background="#1A1A1A" MaxHeight="100">
-                                                <ScrollViewer VerticalScrollBarVisibility="Auto">
-                                                    <ItemsControl ItemsSource="{Binding AvailableDrives}">
-                                                        <ItemsControl.ItemTemplate>
-                                                            <DataTemplate>
-                                                                <CheckBox IsChecked="{Binding IsSelected}" Margin="5,2" Foreground="White">
-                                                                    <TextBlock>
-                                                                        <Run Text="{Binding Name, Mode=OneWay}" FontWeight="Bold"/>
-                                                                        <Run Text=" (" Foreground="Gray"/>
-                                                                        <Run Text="{Binding Label, Mode=OneWay}" Foreground="Gray"/>
-                                                                        <Run Text=" - " Foreground="Gray"/>
-                                                                        <Run Text="{Binding FreeSpace, Mode=OneWay}" Foreground="SpringGreen"/>
-                                                                        <Run Text=" free)" Foreground="Gray"/>
-                                                                    </TextBlock>
-                                                                </CheckBox>
-                                                            </DataTemplate>
-                                                        </ItemsControl.ItemTemplate>
-                                                    </ItemsControl>
-                                                </ScrollViewer>
-                                            </Border>
-                                            <Button Command="{Binding LoadDrivesCommand}" Content="🔄 Refresh Drives" Background="Transparent" Foreground="SpringGreen" BorderThickness="0" HorizontalAlignment="Left" FontSize="10" Margin="0,2,0,0"/>
-                                        </StackPanel>
-                                        
-                                        <!-- Advanced Options -->
-                                        <StackPanel Grid.Column="1">
-                                            <TextBlock Text="PERFORMANCE &amp; FILTERS:" FontWeight="Bold" Foreground="Gray" Margin="0,0,0,5"/>
-                                            <StackPanel Orientation="Horizontal" Margin="0,0,0,5">
-                                                 <CheckBox IsChecked="{Binding UseThreads}" Content="Use Multi-threading" Foreground="White" Margin="0,0,15,0"/>
-                                                 <CheckBox IsChecked="{Binding SkipWindows}" Content="Skip Windows" Foreground="White" Margin="0,0,15,0"/>
-                                                 <CheckBox IsChecked="{Binding SkipProgramFiles}" Content="Skip Program Files" Foreground="White" Margin="0,0,15,0"/>
-                                            </StackPanel>
-                                            <!-- GPU Checkbox Removed as requested -->
-                                            <CheckBox IsChecked="{Binding VerifyGpuHash}" Content="Verify GPU Hashing (Slows performance, ensures accuracy)" 
-                                                      Foreground="#AAAAAA" FontSize="10" Margin="0,0,0,5"
-                                                      Visibility="{Binding UseGpu, Converter={StaticResource BooleanToVisibilityConverter}}"/>
-                                            <TextBlock Text="ℹ️ GPU acceleration requires CUDA-compatible hardware. Multi-threading improves speed on CPU." Foreground="Gray" FontSize="10" TextWrapping="Wrap"/>
-                                        </StackPanel>
-                                    </Grid>
-                                </Border>
                             </StackPanel>
 
                             <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Top" Margin="0,10,0,10">
@@ -350,62 +597,284 @@
                                 <ColumnDefinition Width="Auto"/>
                             </Grid.ColumnDefinitions>
 
-                            <DataGrid x:Name="VaultDataGrid" Grid.Column="0" ItemsSource="{Binding FilteredFiles}" AutoGenerateColumns="False" 
-                                      Background="Transparent" BorderThickness="0" HeadersVisibility="Column"
-                                      IsReadOnly="True" RowBackground="#222" AlternatingRowBackground="#2A2A2A" Foreground="White"
-                                      SelectedItem="{Binding SelectedFile}" SelectionMode="Extended">
-                                <i:Interaction.Triggers>
-                                    <i:EventTrigger EventName="SelectionChanged">
-                                        <i:InvokeCommandAction Command="{Binding UpdateSelectionTallyCommand}" 
-                                                               CommandParameter="{Binding SelectedItems, ElementName=VaultDataGrid}"/>
-                                    </i:EventTrigger>
-                                </i:Interaction.Triggers>
-                                <DataGrid.ContextMenu>
-                                    <ContextMenu>
-                                        <MenuItem Header="🏷️ Tag Selected Files" 
-                                                  Command="{Binding Data.TagSelectedFilesCommand, Source={StaticResource Proxy}}"
-                                                  CommandParameter="{Binding Path=PlacementTarget.SelectedItems, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
-                                        <MenuItem Header="🎙️ Transcribe Selected" 
-                                                  Command="{Binding Data.TranscribeSelectedFilesCommand, Source={StaticResource Proxy}}"
-                                                  CommandParameter="{Binding Path=PlacementTarget.SelectedItems, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
-                                        <Separator/>
-                                        <MenuItem Header="🚫 Ignore these files" 
-                                                  Command="{Binding Data.IgnoreSelectedFilesCommand, Source={StaticResource Proxy}}"
-                                                  CommandParameter="{Binding Path=PlacementTarget.SelectedItems, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
-                                        <MenuItem Header="✅ Unignore these files" 
-                                                  Command="{Binding Data.UnignoreSelectedFilesCommand, Source={StaticResource Proxy}}"
-                                                  CommandParameter="{Binding Path=PlacementTarget.SelectedItems, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
-                                        <Separator/>
-                                        <MenuItem Header="📂 Open in Explorer" 
-                                                  Command="{Binding Data.OpenInExplorerCommand, Source={StaticResource Proxy}}"
-                                                  CommandParameter="{Binding Path=PlacementTarget.SelectedItem, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
-                                        <MenuItem Header="💻 Open in VS Code" 
-                                                  Command="{Binding Data.OpenInVsCodeCommand, Source={StaticResource Proxy}}"
-                                                  CommandParameter="{Binding Path=PlacementTarget.SelectedItem, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
-                                        <MenuItem Header="🐚 Open in PowerShell" 
-                                                  Command="{Binding Data.OpenInPowerShellCommand, Source={StaticResource Proxy}}"
-                                                  CommandParameter="{Binding Path=PlacementTarget.SelectedItem, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
-                                        <MenuItem Header="📟 Open in CMD" 
-                                                  Command="{Binding Data.OpenInCmdCommand, Source={StaticResource Proxy}}"
-                                                  CommandParameter="{Binding Path=PlacementTarget.SelectedItem, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
-                                    </ContextMenu>
-                                </DataGrid.ContextMenu>
-                                <DataGrid.Columns>
-                                    <DataGridCheckBoxColumn Header="Ignored" Binding="{Binding IsIgnored}" Width="60"/>
-                                    <DataGridTextColumn Header="Name" Binding="{Binding FileName}" Width="200">
-                                        <DataGridTextColumn.ElementStyle>
-                                            <Style TargetType="TextBlock">
-                                                <Setter Property="FontWeight" Value="Bold"/>
-                                            </Style>
-                                        </DataGridTextColumn.ElementStyle>
-                                    </DataGridTextColumn>
-                                    <DataGridTextColumn Header="Path" Binding="{Binding FilePath}" Width="*"/>
-                                    <DataGridTextColumn Header="Type" Binding="{Binding FileType}" Width="120"/>
-                                    <DataGridTextColumn Header="Size" Binding="{Binding FileSize, Converter={StaticResource FileSizeConverter}}" Width="100"/>
-                                    <DataGridTextColumn Header="Created" Binding="{Binding CreationTime, StringFormat=yyyy-MM-dd HH:mm}" Width="140"/>
-                                    <DataGridTextColumn Header="Modified" Binding="{Binding LastModified, StringFormat=yyyy-MM-dd HH:mm}" Width="140"/>
-                                </DataGrid.Columns>
-                            </DataGrid>
+
+                            <!-- Hierarchical Navigation View -->
+                            <Grid Grid.Column="0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="250" MinWidth="150" MaxWidth="400"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+
+                                <!-- Left: Directory Tree -->
+                                <Border Background="#1A1A1A" BorderBrush="#333" BorderThickness="0,0,1,0">
+                                    <Grid>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="*"/>
+                                        </Grid.RowDefinitions>
+                                        <TextBlock Text="FOLDERS" Foreground="Gray" FontWeight="Bold" Margin="10,5"/>
+                                        <TreeView Grid.Row="1" ItemsSource="{Binding RootFolders}" ItemTemplate="{StaticResource FolderTreeTemplate}"
+                                                  Background="Transparent" BorderThickness="0" Foreground="White">
+                                            <TreeView.ItemContainerStyle>
+                                                <Style TargetType="TreeViewItem">
+                                                    <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}"/>
+                                                    <Setter Property="IsSelected" Value="{Binding IsSelected, Mode=TwoWay}"/>
+                                                    <Setter Property="BindingGroup" Value="{Binding CurrentFolder, Mode=TwoWay}"/> <!-- Hacky binding? No -->
+                                                    <!-- Simple selection binding in VM via IsSelected property on nodes -->
+                                                </Style>
+                                            </TreeView.ItemContainerStyle>
+                                            <i:Interaction.Triggers>
+                                                <i:EventTrigger EventName="SelectedItemChanged">
+                                                    <i:InvokeCommandAction Command="{Binding DataContext.FilterCommand, RelativeSource={RelativeSource AncestorType=Window}}" /> 
+                                                    <!-- Actually, we bind SelectedItem. VM uses IsSelected property on nodes or we bind SelectedItem here.
+                                                         WPF TreeView SelectedItem is read-only. We need a behavior or just rely on IsSelected property in FolderNode.
+                                                         ViewModel listens to PropertyChanged of FolderNodes? Or we bind a behavior.
+                                                         Simplest: Event to Command with EventArgs, pass NewValue. -->
+                                                    <!-- Let's just use the VM property 'CurrentFolder' set via the IsSelected binding style if possible, 
+                                                         BUT TreeViewItem.IsSelected doesn't automatically sync to a single 'CurrentFolder' property in VM easily without exclusive selection logic.
+                                                         Let's assume the user clicks, and we just use 'SelectedItemChanged' event to set 'CurrentFolder' in CodeBehind or use an Interaction Trigger passing the Item. -->
+                                                    <i:InvokeCommandAction Command="{Binding Data.SetCurrentFolderCommand, Source={StaticResource Proxy}}" 
+                                                                           CommandParameter="{Binding SelectedItem, RelativeSource={RelativeSource AncestorType=TreeView}}"/> 
+                                                    <!-- Wait, I don't have SetCurrentFolderCommand. I use 'CurrentFolder' property.
+                                                         I need to be able to set it.
+                                                         Let's add a behavior or simple code-behind if needed? 
+                                                         Or simpler: Just use the IsSelected two-way binding on the ContainerStyle, 
+                                                         and in FolderNode setter of IsSelected, if true, update the VM Main CurrentFolder?
+                                                         Yes, that requires FolderNode to have reference to VM or Messenger.
+                                                         
+                                                         Alternative: Interaction.Triggers standard way:
+                                                         CommandParameter is the SelectedItem.
+                                                         I need a command in VM "SetCurrentFolder". I don't have it.
+                                                         I'll add a relay command for this or use 'UpdateSelectionTally' style?
+                                                         
+                                                         Let's hack: Bind to 'CurrentFolder' using a Behavior? Too complex to add 5 files.
+                                                         Let's just use the `Source={StaticResource Proxy}` to call a command `SelectFolder` which I will add to VM implicitly or just rely on the user clicking and us handling it.
+                                                         
+                                                         Actually, I'll add `[RelayCommand] public void SelectFolder(FolderNode folder) => CurrentFolder = folder;` to VM if I can.
+                                                         But I can't edit VM again easily right now.
+                                                         
+                                                         EXISTING properties? `CurrentFolder` is a property.
+                                                         Can I bind TreeView.SelectedItem to it? not in pure XAML easily.
+                                                         
+                                                         Let's try to stick to what I have. I have `FolderNode.IsSelected`. 
+                                                         If I bind `IsSelected` in ItemContainerStyle, when I click, it sets True.
+                                                         VM needs to know.
+                                                         
+                                                         I'll add the `SetCurrentFolderCommand` to the VM in a quick edit afterwards if needed, 
+                                                         OR I can just rely on the `ApplyFilters` being called when `CurrentFolder` changes.
+                                                         To change `CurrentFolder`, I need the binding.
+                                                    
+                                                         I will stick with: `IsSelected` binding. 
+                                                         AND I will add a `SelectFolder` command to VM quickly before I forget.
+                                                         Actually, `FolderNode` is simple.
+                                                         
+                                                         Let's use `i:InvokeCommandAction` with a new command I'll add: `SelectFolder`.
+                                                    -->
+                                                </i:EventTrigger>
+                                            </i:Interaction.Triggers>
+                                        </TreeView>
+                                    </Grid>
+                                </Border>
+
+                                <GridSplitter Grid.Column="1" Width="5" HorizontalAlignment="Center" Background="#333"/>
+
+                                <!-- Right: Content -->
+                                <Grid Grid.Column="2">
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto"/> <!-- Timeline -->
+                                        <RowDefinition Height="Auto"/> <!-- Chips -->
+                                        <RowDefinition Height="*"/>    <!-- DataGrid -->
+                                        <RowDefinition Height="Auto"/> <!-- Splitter -->
+                                        <RowDefinition Height="200"/>  <!-- History -->
+                                    </Grid.RowDefinitions>
+                                    
+                                    <!-- Timeline -->
+                                    <Border Background="#222" Margin="0,0,0,5" Padding="5">
+                                        <StackPanel>
+                                            <TextBlock Text="ACTIVITY TIMELINE" Foreground="Gray" FontSize="9" FontWeight="Bold" Margin="0,0,0,2"/>
+                                            <!-- ItemsControl for bars -->
+                                            <ItemsControl ItemsSource="{Binding ActivityStats}" ItemTemplate="{StaticResource TimelineItemTemplate}" Height="50" VerticalAlignment="Bottom">
+                                                <ItemsControl.ItemsPanel>
+                                                    <ItemsPanelTemplate>
+                                                        <StackPanel Orientation="Horizontal" VerticalAlignment="Bottom"/>
+                                                    </ItemsPanelTemplate>
+                                                </ItemsControl.ItemsPanel>
+                                            </ItemsControl>
+                                            <!-- Simple Interaction: Click on timeline? logic needed. For now just visual. -->
+                                        </StackPanel>
+                                    </Border>
+                                    
+                                    <!-- Filter Chips -->
+                                    <Border Grid.Row="1" Background="#222" Margin="0,0,0,5" Padding="5">
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="FILTERS:" Foreground="Gray" FontSize="9" FontWeight="Bold" VerticalAlignment="Center" Margin="0,0,5,0"/>
+                                            <ItemsControl ItemsSource="{Binding ExtensionChips}">
+                                                <ItemsControl.ItemsPanel>
+                                                    <ItemsPanelTemplate>
+                                                        <WrapPanel Orientation="Horizontal"/>
+                                                    </ItemsPanelTemplate>
+                                                </ItemsControl.ItemsPanel>
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate>
+                                                        <ToggleButton Content="{Binding Description}" IsChecked="{Binding IsChecked}" 
+                                                                      Background="Transparent" Foreground="White" BorderThickness="1" BorderBrush="#444" 
+                                                                      Margin="0,0,5,0" Padding="5,2" FontSize="10">
+                                                            <ToggleButton.Style>
+                                                                <Style TargetType="ToggleButton">
+                                                                    <Style.Triggers>
+                                                                        <Trigger Property="IsChecked" Value="True">
+                                                                            <Setter Property="Background" Value="#333"/>
+                                                                            <Setter Property="BorderBrush" Value="SpringGreen"/>
+                                                                            <Setter Property="Foreground" Value="SpringGreen"/>
+                                                                        </Trigger>
+                                                                    </Style.Triggers>
+                                                                </Style>
+                                                            </ToggleButton.Style>
+                                                        </ToggleButton>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                        </StackPanel>
+                                    </Border>
+
+                                    <!-- Grouped DataGrid -->
+                                    <!-- Note: Using GroupedFilesSource resource -->
+                                    <DataGrid Grid.Row="2" x:Name="VaultDataGrid" ItemsSource="{Binding Source={StaticResource GroupedFilesSource}}" AutoGenerateColumns="False" 
+                                              Background="Transparent" BorderThickness="0" HeadersVisibility="Column"
+                                              IsReadOnly="True" RowBackground="#222" AlternatingRowBackground="#2A2A2A" Foreground="White"
+                                              SelectedItem="{Binding SelectedFile}" SelectionMode="Extended">
+                                        
+                                        <DataGrid.GroupStyle>
+                                             <GroupStyle>
+                                                 <GroupStyle.HeaderTemplate>
+                                                     <DataTemplate>
+                                                         <StackPanel>
+                                                             <TextBlock Text="{Binding Name}" FontWeight="Bold" Foreground="#87CEFA" Padding="5" Background="#333"/>
+                                                         </StackPanel>
+                                                     </DataTemplate>
+                                                 </GroupStyle.HeaderTemplate>
+                                                 <GroupStyle.ContainerStyle>
+                                                     <Style TargetType="{x:Type GroupItem}">
+                                                         <Setter Property="Template">
+                                                             <Setter.Value>
+                                                                 <ControlTemplate TargetType="{x:Type GroupItem}">
+                                                                     <Expander IsExpanded="True" BorderThickness="0,0,0,1" BorderBrush="#444">
+                                                                         <Expander.Header>
+                                                                             <StackPanel Orientation="Horizontal">
+                                                                                 <TextBlock Text="{Binding Name}" FontWeight="Bold" Foreground="SpringGreen" VerticalAlignment="Bottom"/>
+                                                                                 <TextBlock Text="{Binding ItemCount, StringFormat=' ({} items)'}" Foreground="Gray" FontStyle="Italic" VerticalAlignment="Bottom" Margin="5,0,0,0"/>
+                                                                             </StackPanel>
+                                                                         </Expander.Header>
+                                                                         <ItemsPresenter />
+                                                                     </Expander>
+                                                                 </ControlTemplate>
+                                                             </Setter.Value>
+                                                         </Setter>
+                                                     </Style>
+                                                 </GroupStyle.ContainerStyle>
+                                             </GroupStyle>
+                                        </DataGrid.GroupStyle>
+
+                                        <i:Interaction.Triggers>
+                                            <i:EventTrigger EventName="SelectionChanged">
+                                                <i:InvokeCommandAction Command="{Binding UpdateSelectionTallyCommand}" 
+                                                                       CommandParameter="{Binding SelectedItems, ElementName=VaultDataGrid}"/>
+                                            </i:EventTrigger>
+                                        </i:Interaction.Triggers>
+                                        <DataGrid.ContextMenu>
+                                            <ContextMenu>
+                                                <MenuItem Header="🏷️ Tag Selected Files" 
+                                                          Command="{Binding Data.TagSelectedFilesCommand, Source={StaticResource Proxy}}"
+                                                          CommandParameter="{Binding Path=PlacementTarget.SelectedItems, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
+                                                <MenuItem Header="🎙️ Transcribe Selected" 
+                                                          Command="{Binding Data.TranscribeSelectedFilesCommand, Source={StaticResource Proxy}}"
+                                                          CommandParameter="{Binding Path=PlacementTarget.SelectedItems, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
+                                                <Separator/>
+                                                <MenuItem Header="🚫 Ignore these files" 
+                                                          Command="{Binding Data.IgnoreSelectedFilesCommand, Source={StaticResource Proxy}}"
+                                                          CommandParameter="{Binding Path=PlacementTarget.SelectedItems, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
+                                                <MenuItem Header="✅ Unignore these files" 
+                                                          Command="{Binding Data.UnignoreSelectedFilesCommand, Source={StaticResource Proxy}}"
+                                                          CommandParameter="{Binding Path=PlacementTarget.SelectedItems, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
+                                                <Separator/>
+                                                <MenuItem Header="📂 Open in Explorer" 
+                                                          Command="{Binding Data.OpenInExplorerCommand, Source={StaticResource Proxy}}"
+                                                          CommandParameter="{Binding Path=PlacementTarget.SelectedItem, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
+                                                <MenuItem Header="💻 Open in VS Code" 
+                                                          Command="{Binding Data.OpenInVsCodeCommand, Source={StaticResource Proxy}}"
+                                                          CommandParameter="{Binding Path=PlacementTarget.SelectedItem, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
+                                                <MenuItem Header="🐚 Open in PowerShell" 
+                                                          Command="{Binding Data.OpenInPowerShellCommand, Source={StaticResource Proxy}}"
+                                                          CommandParameter="{Binding Path=PlacementTarget.SelectedItem, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
+                                                <MenuItem Header="📟 Open in CMD" 
+                                                          Command="{Binding Data.OpenInCmdCommand, Source={StaticResource Proxy}}"
+                                                          CommandParameter="{Binding Path=PlacementTarget.SelectedItem, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
+                                            </ContextMenu>
+                                        </DataGrid.ContextMenu>
+                                        <DataGrid.Columns>
+                                            <DataGridCheckBoxColumn Header="Ignored" Binding="{Binding IsIgnored}" Width="60"/>
+                                            <DataGridTextColumn Header="Name" Binding="{Binding FileName}" Width="200">
+                                                <DataGridTextColumn.ElementStyle>
+                                                    <Style TargetType="TextBlock">
+                                                        <Setter Property="FontWeight" Value="Bold"/>
+                                                    </Style>
+                                                </DataGridTextColumn.ElementStyle>
+                                            </DataGridTextColumn>
+                                            <DataGridTextColumn Header="Path" Binding="{Binding FilePath}" Width="*"/>
+                                            <DataGridTextColumn Header="Type" Binding="{Binding FileType}" Width="120"/>
+                                            <DataGridTextColumn Header="Size" Binding="{Binding FileSize, Converter={StaticResource FileSizeConverter}}" Width="100"/>
+                                            <DataGridTextColumn Header="Created" Binding="{Binding CreationTime, StringFormat=yyyy-MM-dd HH:mm}" Width="140"/>
+                                            <DataGridTextColumn Header="Modified" Binding="{Binding LastModified, StringFormat=yyyy-MM-dd HH:mm}" Width="140"/>
+                                        </DataGrid.Columns>
+                                    </DataGrid>
+
+                                    <!-- Splitter -->
+                                    <GridSplitter Grid.Row="3" Height="5" HorizontalAlignment="Stretch" Background="#333" ShowsPreview="True"/>
+
+                                    <!-- History Panel -->
+                                    <Border Grid.Row="4" Background="#1A1A1A" BorderBrush="#333" BorderThickness="0,1,0,0">
+                                        <Grid>
+                                            <Grid.RowDefinitions>
+                                                <RowDefinition Height="Auto"/>
+                                                <RowDefinition Height="*"/>
+                                            </Grid.RowDefinitions>
+                                            <Border Background="#222" Padding="10,5">
+                                                <StackPanel Orientation="Horizontal">
+                                                    <TextBlock Text="FILE HISTORY" FontWeight="Bold" Foreground="Gray" VerticalAlignment="Center"/>
+                                                    <TextBlock Text="{Binding SelectedFile.FileName, StringFormat=' - {0}'}" Foreground="SpringGreen" FontWeight="Bold" VerticalAlignment="Center" Margin="5,0,0,0"/>
+                                                </StackPanel>
+                                            </Border>
+                                            
+                                            <DataGrid Grid.Row="1" ItemsSource="{Binding SelectedFileHistory}" AutoGenerateColumns="False" 
+                                                      Background="Transparent" BorderThickness="0" HeadersVisibility="Column"
+                                                      IsReadOnly="True" RowBackground="#1A1A1A" AlternatingRowBackground="#222" Foreground="White"
+                                                      GridLinesVisibility="Horizontal" HorizontalGridLinesBrush="#333">
+                                                <DataGrid.Columns>
+                                                    <DataGridTextColumn Header="Time" Binding="{Binding Timestamp, StringFormat=yyyy-MM-dd HH:mm:ss}" Width="150">
+                                                        <DataGridTextColumn.ElementStyle>
+                                                            <Style TargetType="TextBlock">
+                                                                <Setter Property="Foreground" Value="#AAA"/>
+                                                            </Style>
+                                                        </DataGridTextColumn.ElementStyle>
+                                                    </DataGridTextColumn>
+                                                    <DataGridTextColumn Header="Operation" Binding="{Binding Operation}" Width="100">
+                                                         <DataGridTextColumn.ElementStyle>
+                                                            <Style TargetType="TextBlock">
+                                                                <Setter Property="Foreground" Value="SpringGreen"/>
+                                                                <Setter Property="FontWeight" Value="SemiBold"/>
+                                                            </Style>
+                                                        </DataGridTextColumn.ElementStyle>
+                                                    </DataGridTextColumn>
+                                                    <DataGridTextColumn Header="Process" Binding="{Binding ProcessName}" Width="150" Foreground="White"/>
+                                                    <DataGridTextColumn Header="User" Binding="{Binding UserName}" Width="100" Foreground="Gray"/>
+                                                    <DataGridTextColumn Header="Path" Binding="{Binding FilePath}" Width="*" Foreground="Gray"/>
+                                                </DataGrid.Columns>
+                                            </DataGrid>
+                                        </Grid>
+                                    </Border>
+                                </Grid>
+                            </Grid>
 
                             <!-- Side Panels (Stacked Horizontally) -->
                             <StackPanel Grid.Column="1" Orientation="Horizontal">
@@ -962,6 +1431,8 @@
         </Grid>
 
 
+        </Grid> <!-- End Header/Content Wrapper -->
+
         <!-- Footer - Shows Scan Status and Statistics -->
         <StatusBar Grid.Row="1" Background="#111111" Foreground="Gray" Padding="5,2">
             <StatusBarItem>
@@ -993,16 +1464,14 @@
                     <TextBlock Text="{Binding HashETA}" Foreground="Cyan" FontWeight="Bold" Margin="10,0,0,0" VerticalAlignment="Center"/>
 
                     <Separator Width="1" Background="#333" Margin="10,0"/>
+
+                    <TextBlock Text="Last Scanned: " Foreground="Gray"/>
+                    <TextBlock Text="{Binding LastScannedTime}" Foreground="White" Margin="0,0,15,0"/>
+
+                    <Separator Width="1" Background="#333" Margin="10,0"/>
                     
                     <TextBlock Text="Status: " FontWeight="Bold"/>
                     <TextBlock Text="{Binding StatusMessage}" Foreground="SpringGreen" Margin="0,0,20,0"/>
-                </StackPanel>
-            </StatusBarItem>
-
-            <StatusBarItem HorizontalAlignment="Right">
-                <StackPanel Orientation="Horizontal">
-                    <TextBlock Text="Last Scanned: " Foreground="Gray"/>
-                    <TextBlock Text="{Binding LastScannedTime}" Foreground="White" Margin="0,0,10,0"/>
                 </StackPanel>
             </StatusBarItem>
         </StatusBar>

@@ -21,14 +21,22 @@ namespace SecureFileMonitor.UI.ViewModels
                 Label = drive.VolumeLabel;
                 TotalSize = FormatSize(drive.TotalSize);
                 FreeSpace = FormatSize(drive.TotalFreeSpace);
+                
+                if (drive.TotalSize > 0)
+                {
+                    UsagePercentage = (1.0 - ((double)drive.TotalFreeSpace / drive.TotalSize)) * 100;
+                }
             }
             catch 
             {
                 Label = "Unknown";
                 TotalSize = "?";
                 FreeSpace = "?";
+                UsagePercentage = 0;
             }
         }
+
+        public double UsagePercentage { get; private set; }
 
         private string FormatSize(long bytes)
         {

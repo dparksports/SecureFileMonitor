@@ -8,6 +8,7 @@ using SecureFileMonitor.UI.ViewModels;
 using System.Security.Principal;
 using System.Diagnostics;
 using System;
+using System.Threading.Tasks; // Added for TaskScheduler
 
 namespace SecureFileMonitor.UI
 {
@@ -18,6 +19,50 @@ namespace SecureFileMonitor.UI
 
         public App()
         {
+            this.DispatcherUnhandledException += App_DispatcherUnhandledException;
+            AppDomain.CurrentDomain.UnhandledException += CurrentDomain_UnhandledException;
+            TaskScheduler.UnobservedTaskException += TaskScheduler_UnobservedTaskException;
+        }
+
+        private void App_DispatcherUnhandledException(object sender, System.Windows.Threading.DispatcherUnhandledExceptionEventArgs e)
+        {
+            Log.Error(e.Exception, "UI Thread Exception");
+            LogToCrashFile(e.Exception, "UI_Thread_Crash");
+            MessageBox.Show($"Unexpected UI Error: {e.Exception.Message}\n\nDetails saved to crash_log.txt", "Critical Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            e.Handled = true; // Prevent crash if possible
+        }
+
+        private void CurrentDomain_UnhandledException(object sender, UnhandledExceptionEventArgs e)
+        {
+             var ex = e.ExceptionObject as Exception;
+             if (ex != null)
+             {
+                 Log.Fatal(ex, "Domain Unhandled Exception");
+                 LogToCrashFile(ex, "Fatal_Domain_Crash");
+             }
+             MessageBox.Show($"Critical Runtime Error: {ex?.Message}\n\nDetails saved to crash_log.txt", "Fatal Crash", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+
+        private void TaskScheduler_UnobservedTaskException(object? sender, UnobservedTaskExceptionEventArgs e)
+        {
+            // Log but don't show message box for unobserved tasks to avoid spam, unless critical
+            Log.Error(e.Exception, "Unobserved Task Exception");
+            LogToCrashFile(e.Exception, "Background_Task_Exception");
+            e.SetObserved();
+        }
+
+        private void LogToCrashFile(Exception ex, string type)
+        {
+            try
+            {
+                string crashFile = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "crash_log.txt");
+                string logContent = $"[{DateTime.Now}] [{type}]\nMessage: {ex.Message}\nStack Trace:\n{ex.StackTrace}\n\n--------------------------------------------------\n\n";
+                File.AppendAllText(crashFile, logContent);
+            }
+            catch 
+            {
+                // Last resort: fails quietly if we can't even write to disk
+            }
         }
 
         protected override async void OnStartup(StartupEventArgs e)

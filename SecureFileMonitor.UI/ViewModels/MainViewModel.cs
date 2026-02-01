@@ -28,6 +28,30 @@ namespace SecureFileMonitor.UI.ViewModels
         public ObservableCollection<string> IgnoredProcesses { get; } = new();
         public ObservableCollection<TranscriptionTask> FilteredTranscribedFiles { get; } = new();
 
+        // New Navigation Properties
+        [ObservableProperty]
+        private ObservableCollection<FolderNode> _rootFolders = new();
+        [ObservableProperty]
+        private ObservableCollection<FilterChip> _extensionChips = new();
+        [ObservableProperty]
+        private ObservableCollection<ActivitySession> _activityStats = new();
+
+        [ObservableProperty]
+        private FolderNode? _currentFolder;
+
+        partial void OnCurrentFolderChanged(FolderNode? value)
+        {
+            ApplyFilters();
+        }
+
+        [ObservableProperty]
+        private ActivitySession? _selectedSession;
+
+        partial void OnSelectedSessionChanged(ActivitySession? value)
+        {
+             ApplyFilters();
+        }
+
         [ObservableProperty]
         private bool _showIgnoredProcesses;
 
@@ -42,6 +66,7 @@ namespace SecureFileMonitor.UI.ViewModels
 
         async partial void OnSelectedFileChanged(FileEntry? value)
         {
+             await LoadFileHistory(value);
              if (value != null)
              {
                  try
@@ -92,9 +117,35 @@ namespace SecureFileMonitor.UI.ViewModels
         public ObservableCollection<FileActivityEvent> OfflineActivity { get; } = new();
         public ObservableCollection<FileEntry> DuplicateFiles { get; } = new();
         public ObservableCollection<FileEntry> SearchResults { get; } = new();
-        public ObservableCollection<FileEntry> AllFiles { get; } = new();
-        public ObservableCollection<FileEntry> FilteredFiles { get; } = new();
+        
+        [ObservableProperty]
+        private ObservableCollection<FileEntry> _allFiles = new();
+        [ObservableProperty]
+        private ObservableCollection<FileEntry> _filteredFiles = new();
+        
         public ObservableCollection<TranscriptionTask> TranscribeQueue { get; } = new();
+        
+        // File History Feature
+        public ObservableCollection<FileActivityEvent> SelectedFileHistory { get; } = new();
+
+        // Duplicate _selectedFile removed. merging logic into existing OnSelectedFileChanged above.
+
+        private async Task LoadFileHistory(FileEntry? file)
+        {
+            if (file == null) 
+            {
+                System.Windows.Application.Current.Dispatcher.Invoke(() => SelectedFileHistory.Clear());
+                return;
+            }
+
+            var history = await _dbService.GetFileHistoryAsync(file.FilePath);
+            
+            System.Windows.Application.Current.Dispatcher.Invoke(() => 
+            {
+                SelectedFileHistory.Clear();
+                foreach(var h in history) SelectedFileHistory.Add(h);
+            });
+        }
 
         [ObservableProperty]
         private TranscriptionTask? _selectedTranscriptionTask;
@@ -159,6 +210,14 @@ namespace SecureFileMonitor.UI.ViewModels
              try { await _dbService.SaveSettingAsync("SkipProgramFiles", value.ToString()); } catch { /* Ignore */ }
         }
 
+        [ObservableProperty]
+        private bool _skipRecycleBin = true; // Default to true
+
+        async partial void OnSkipRecycleBinChanged(bool value)
+        {
+             try { await _dbService.SaveSettingAsync("SkipRecycleBin", value.ToString()); } catch { /* Ignore */ }
+        }
+
         // Sorting
         [ObservableProperty]
         private string _sortBy = "LastModified"; // Default to LastModified to show actual work first
@@ -177,6 +236,9 @@ namespace SecureFileMonitor.UI.ViewModels
 
         [ObservableProperty]
         private DateTime? _dateFilterEnd;
+
+        partial void OnDateFilterStartChanged(DateTime? value) => ApplyFilters();
+        partial void OnDateFilterEndChanged(DateTime? value) => ApplyFilters();
 
         [ObservableProperty]
         private int _selectedItemsCount;
@@ -198,6 +260,188 @@ namespace SecureFileMonitor.UI.ViewModels
         {
             IsLiveActivityPaused = !IsLiveActivityPaused;
         }
+
+
+        [RelayCommand]
+        private void SetCurrentFolder(FolderNode? folder)
+        {
+            CurrentFolder = folder;
+        }
+
+        // --- NEW LOGIC FOR HIERARCHICAL VIEW ---
+
+        // --- NEW LOGIC FOR HIERARCHICAL VIEW ---
+
+        private List<FolderNode> CalculateTree(List<FileEntry> files)
+        {
+            var rootFolders = new List<FolderNode>();
+            var root = new FolderNode { Name = "All Files", FullPath = "", IsSelected = true, IsExpanded = true };
+            // CurrentFolder = root; // Handle in UI thread
+            
+            root.FileCount = files.Count;
+            // var nodeCache = new Dictionary<string, FolderNode>(); // Optimization if needed
+
+            foreach (var file in files)
+            {
+                if (string.IsNullOrEmpty(file.FilePath)) continue;
+                string dir = Path.GetDirectoryName(file.FilePath) ?? "";
+                if (string.IsNullOrEmpty(dir)) continue;
+
+                string[] parts = dir.Split(Path.DirectorySeparatorChar);
+                FolderNode? current = null;
+
+                // Handle Drive Letter as root
+                string drive = parts[0]; 
+                if (!string.IsNullOrEmpty(drive)) 
+                {
+                     // Check existing roots
+                     var existingRoot = rootFolders.FirstOrDefault(r => r.Name == drive);
+                     if (existingRoot == null)
+                     {
+                         existingRoot = new FolderNode { Name = drive, FullPath = drive };
+                         rootFolders.Add(existingRoot);
+                     }
+                     current = existingRoot;
+                     current.FileCount++;
+                }
+
+                // Traverse down
+                for (int i = 1; i < parts.Length; i++)
+                {
+                    if (current == null) break;
+                    string part = parts[i];
+                    string partialPath = Path.Combine(current.FullPath, part);
+                    
+                    current = current.GetOrCreateChild(part, partialPath);
+                    current.FileCount++;
+                }
+            }
+            
+            rootFolders.Insert(0, root);
+            return rootFolders;
+        }
+
+        private List<FilterChip> CalculateChips(List<FileEntry> files, HashSet<string>? currentSelection = null)
+        {
+            var updatedChips = new List<FilterChip>();
+            // Use provided selection or default to all? 
+            // If null, we might be taking fresh state. 
+            
+            var grouped = files.GroupBy(f => f.FileExtension.ToLower())
+                                  .Select(g => new { Ext = g.Key, Count = g.Count() })
+                                  .OrderByDescending(x => x.Count)
+                                  .ToList();
+
+            foreach (var g in grouped)
+            {
+                if (string.IsNullOrEmpty(g.Ext)) continue;
+                // Preserve selection logic
+                bool isChecked = currentSelection == null || currentSelection.Contains(g.Ext);
+                
+                var chip = new FilterChip { Extension = g.Ext, Count = g.Count, IsChecked = isChecked };
+                updatedChips.Add(chip);
+            }
+            return updatedChips;
+        }
+
+        private List<ActivitySession> CalculateTimeline(List<FileEntry> files) 
+        {
+            var stats = new List<ActivitySession>();
+            if (files.Count == 0) return stats;
+
+            var ordered = files.OrderBy(f => f.LastModified).ToList();
+            if (ordered.Count == 0) return stats;
+
+            var currentSession = new ActivitySession 
+            { 
+                StartTime = ordered[0].LastModified, 
+                EndTime = ordered[0].LastModified,
+                FileCount = 0 
+            };
+
+            foreach (var file in ordered)
+            {
+                if ((file.LastModified - currentSession.EndTime).TotalMinutes > 60) 
+                {
+                    currentSession.Intensity = CalculateIntensity(currentSession.FileCount);
+                    stats.Add(currentSession);
+
+                    currentSession = new ActivitySession 
+                    { 
+                        StartTime = file.LastModified, 
+                        EndTime = file.LastModified,
+                        FileCount = 0 
+                    };
+                }
+
+                currentSession.EndTime = file.LastModified;
+                currentSession.FileCount++;
+            }
+            
+            currentSession.Intensity = CalculateIntensity(currentSession.FileCount);
+            stats.Add(currentSession);
+            return stats;
+        }
+
+        private double CalculateIntensity(int count)
+        {
+            if (count > 50) return 1.0;
+            if (count > 20) return 0.8;
+            if (count > 10) return 0.6;
+            if (count > 5) return 0.4;
+            return 0.2;
+        }
+
+        private void ApplyFilters()
+        {
+            // Run on background then dispatch update? 
+            // This method is called by UI events (Chips, Selection), so it might need to be fast.
+            // For huge lists, filtering is O(N).
+            // Let's optimize:
+            
+            if (AllFiles.Count == 0) return;
+
+            // Capture state
+            var allowedExtensions = ExtensionChips.Where(c => c.IsChecked).Select(c => c.Extension.ToLower()).ToHashSet();
+            var currentFolder = CurrentFolder;
+            var session = SelectedSession;
+            var start = DateFilterStart;
+            var end = DateFilterEnd;
+            var filesSnapshot = AllFiles.ToList(); // Thread safety? properties are on UI thread.
+
+            Task.Run(() => 
+            {
+                var filtered = filesSnapshot.Where(f => 
+                {
+                    if (!allowedExtensions.Contains(f.FileExtension.ToLower())) return false;
+                    
+                    if (currentFolder != null && currentFolder.Name != "All Files")
+                    {
+                        if (!f.FilePath.StartsWith(currentFolder.FullPath, StringComparison.OrdinalIgnoreCase)) return false;
+                    }
+
+                    if (session != null)
+                    {
+                        if (f.LastModified < session.StartTime || f.LastModified > session.EndTime) return false;
+                    }
+                    
+                    if (start.HasValue && f.LastModified < start.Value) return false;
+                    if (end.HasValue && f.LastModified > end.Value) return false;
+
+                    return true;
+                }).ToList();
+
+                var filteredList = filtered; // List<FileEntry>
+
+                System.Windows.Application.Current.Dispatcher.Invoke(() =>
+                {
+                    // Optimization: Replace the collection entirely to avoid O(N) CollectionChanged events
+                    FilteredFiles = new ObservableCollection<FileEntry>(filteredList);
+                    UpdateSelectionTally(FilteredFiles);
+                });
+            });
+        }
+
 
         [ObservableProperty]
         private int _maxLiveItems = 50;
@@ -355,17 +599,26 @@ namespace SecureFileMonitor.UI.ViewModels
         [RelayCommand]
         public async Task LoadDrives()
         {
-             var drives = DriveInfo.GetDrives().Where(d => d.IsReady && (d.DriveType == DriveType.Fixed || d.DriveType == DriveType.Removable));
-             AvailableDrives.Clear();
-             
-             // Restore previous selection if possible? For now default all true.
-             // Or load from DB (SavedSelectedDrives).
-             // Implementing basic load for now.
-             
-             foreach (var d in drives)
+             await Task.Run(async () => 
              {
-                 AvailableDrives.Add(new DriveViewModel(d));
-             }
+                 try
+                 {
+                     var drives = DriveInfo.GetDrives().Where(d => d.IsReady && (d.DriveType == DriveType.Fixed || d.DriveType == DriveType.Removable)).ToList();
+                     
+                     await System.Windows.Application.Current.Dispatcher.InvokeAsync(() => 
+                     {
+                         AvailableDrives.Clear();
+                         foreach (var d in drives)
+                         {
+                             AvailableDrives.Add(new DriveViewModel(d));
+                         }
+                     });
+                 }
+                 catch (Exception ex)
+                 {
+                     System.Diagnostics.Debug.WriteLine($"Error loading drives: {ex.Message}");
+                 }
+             });
         }
         
         [ObservableProperty]
@@ -420,21 +673,47 @@ namespace SecureFileMonitor.UI.ViewModels
         public async Task LoadAllFiles()
         {
              StatusMessage = "Loading files...";
-             // Simple implementation to satisfy build and functionality
-             var files = await _dbService.GetAllFilesAsync();
+             var filesList = (await _dbService.GetAllFilesAsync()).ToList();
              
-             System.Windows.Application.Current.Dispatcher.Invoke(() =>
-             {
-                 AllFiles.Clear();
-                 foreach(var f in files) AllFiles.Add(f);
-                 
-                 FilteredFiles.Clear();
-                 foreach(var f in AllFiles) FilteredFiles.Add(f);
-             });
-             
-             UpdateSelectionTally(null); 
-             StatusMessage = $"Loaded {AllFiles.Count} files.";
-        }
+             StatusMessage = $"Processing {filesList.Count} files...";
+
+        // Capture current state on UI thread before background task
+        var currentSelection = ExtensionChips.Where(c => c.IsChecked).Select(c => c.Extension).ToHashSet();
+
+        // Run heavy calculations in background
+        await Task.Run(() => 
+        {
+            var tree = CalculateTree(filesList);
+            var chips = CalculateChips(filesList, currentSelection);
+            var timeline = CalculateTimeline(filesList);
+
+            System.Windows.Application.Current.Dispatcher.Invoke(() =>
+            {
+                // Instant update by replacing collections
+                AllFiles = new ObservableCollection<FileEntry>(filesList);
+                RootFolders = new ObservableCollection<FolderNode>(tree);
+
+                var newChips = new ObservableCollection<FilterChip>();
+                foreach(var chip in chips) 
+                {
+                    chip.PropertyChanged += (s, e) => 
+                    {
+                        if (e.PropertyName == nameof(FilterChip.IsChecked)) ApplyFilters();
+                    };
+                    newChips.Add(chip);
+                }
+                ExtensionChips = newChips;
+
+                ActivityStats = new ObservableCollection<ActivitySession>(timeline);
+
+                // Initial Filter pass
+                FilteredFiles = new ObservableCollection<FileEntry>(filesList);
+                UpdateSelectionTally(FilteredFiles);
+            });
+        });
+        
+        StatusMessage = $"Loaded {filesList.Count} files.";
+    }
 
         // ...
 
@@ -464,12 +743,15 @@ namespace SecureFileMonitor.UI.ViewModels
                 string? isPausedVal = await _dbService.GetSettingAsync("IsPaused");
                 string? skipWindowsVal = await _dbService.GetSettingAsync("SkipWindows");
                 string? skipProgramFilesVal = await _dbService.GetSettingAsync("SkipProgramFiles");
+                string? skipRecycleBinVal = await _dbService.GetSettingAsync("SkipRecycleBin");
 
                 UseGpu = bool.TryParse(useGpuVal, out bool g) && g;
                 UseThreads = bool.TryParse(useThreadsVal, out bool t) && t;
                 VerifyGpuHash = bool.TryParse(verifyVal, out bool v) && v;
                 SkipWindows = bool.TryParse(skipWindowsVal, out bool sw) && sw;
                 SkipProgramFiles = bool.TryParse(skipProgramFilesVal, out bool sp) && sp;
+                // Default SkipRecycleBin to true if null
+                SkipRecycleBin = skipRecycleBinVal == null ? true : (bool.TryParse(skipRecycleBinVal, out bool srb) && srb);
                 
                 // Restore Pause State
                 if (bool.TryParse(isPausedVal, out bool p) && p)
@@ -515,7 +797,7 @@ namespace SecureFileMonitor.UI.ViewModels
                     if (_scanCts.Token.IsCancellationRequested || IsPaused) break;
 
                     StatusMessage = $"{modeName}: Scanning {drive.Name}...";
-                    await _scannerService.ScanDriveAsync(drive.Name, ScanReparseFolders, SkipWindows, SkipProgramFiles, isFullScan, progress, _scanCts.Token);
+                    await _scannerService.ScanDriveAsync(drive.Name, ScanReparseFolders, SkipWindows, SkipProgramFiles, SkipRecycleBin, isFullScan, progress, _scanCts.Token);
                 }
 
 

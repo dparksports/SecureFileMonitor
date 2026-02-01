@@ -23,6 +23,8 @@ namespace SecureFileMonitor.Core.Services
 
         public async Task InitializeAsync(string password)
         {
+            if (_connection != null) return;
+
             var options = new SQLiteConnectionString(_dbPath, true, key: password);
             _connection = new SQLiteAsyncConnection(options);
 
@@ -133,6 +135,14 @@ namespace SecureFileMonitor.Core.Services
                                      .Where(e => e.ProcessName == "System (Offline)" || e.ProcessName == "Scanner (Offline Detection)")
                                      .OrderByDescending(e => e.Timestamp)
                                      .Take(safeLimit)
+                                     .ToListAsync();
+        }
+
+        public async Task<List<FileActivityEvent>> GetFileHistoryAsync(string filePath)
+        {
+            return await _connection!.Table<FileActivityEvent>()
+                                     .Where(e => e.FilePath == filePath)
+                                     .OrderByDescending(e => e.Timestamp)
                                      .ToListAsync();
         }
 

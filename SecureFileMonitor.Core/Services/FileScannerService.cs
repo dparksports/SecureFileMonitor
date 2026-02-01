@@ -54,7 +54,7 @@ namespace SecureFileMonitor.Core.Services
             public bool IsPaused => false; // handled externally
         }
 
-        public async Task ScanDriveAsync(string driveLetter, bool scanReparseFolders, bool skipWindows, bool skipProgramFiles, bool forceFullScan, IProgress<(string Status, double? Percent, TimeSpan? ETA)> progress, CancellationToken cancellationToken)
+        public async Task ScanDriveAsync(string driveLetter, bool scanReparseFolders, bool skipWindows, bool skipProgramFiles, bool skipRecycleBin, bool forceFullScan, IProgress<(string Status, double? Percent, TimeSpan? ETA)> progress, CancellationToken cancellationToken)
         {
             var ignoreRules = (await _dbService.GetAllIgnoreRulesAsync()).ToList();
             
@@ -106,7 +106,7 @@ namespace SecureFileMonitor.Core.Services
                 }
 
                 // --- ROBUST SKIP LOGIC FOR QUEUED ITEMS ---
-                if (skipWindows || skipProgramFiles)
+                if (skipWindows || skipProgramFiles || skipRecycleBin)
                 {
                     bool shouldSkip = false;
                     var segments = dirState.Path.Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
@@ -115,6 +115,9 @@ namespace SecureFileMonitor.Core.Services
                         shouldSkip = true;
                         
                     if (!shouldSkip && skipProgramFiles && segments.Any(s => s.Equals("Program Files", StringComparison.OrdinalIgnoreCase) || s.Equals("Program Files (x86)", StringComparison.OrdinalIgnoreCase)))
+                        shouldSkip = true;
+
+                    if (!shouldSkip && skipRecycleBin && segments.Any(s => s.Equals("$Recycle.Bin", StringComparison.OrdinalIgnoreCase)))
                         shouldSkip = true;
 
                     if (shouldSkip)
@@ -131,7 +134,7 @@ namespace SecureFileMonitor.Core.Services
                 try
                 {
                     var dirInfo = new DirectoryInfo(dirState.Path);
-                    await ScanSingleDirectoryAsync(dirInfo, hasher, scanReparseFolders, skipWindows, skipProgramFiles, forceFullScan, ignoreRules, progress, cancellationToken, state);
+                    await ScanSingleDirectoryAsync(dirInfo, hasher, scanReparseFolders, skipWindows, skipProgramFiles, skipRecycleBin, forceFullScan, ignoreRules, progress, cancellationToken, state);
                 }
                 catch (Exception ex)
                 {
@@ -144,7 +147,7 @@ namespace SecureFileMonitor.Core.Services
             }
         }
 
-        private async Task ScanSingleDirectoryAsync(DirectoryInfo directory, IHasherService hasher, bool scanReparseFolders, bool skipWindows, bool skipProgramFiles, bool forceFullScan,
+        private async Task ScanSingleDirectoryAsync(DirectoryInfo directory, IHasherService hasher, bool scanReparseFolders, bool skipWindows, bool skipProgramFiles, bool skipRecycleBin, bool forceFullScan,
             List<IgnoreRule> ignoreRules, 
             IProgress<(string Status, double? Percent, TimeSpan? ETA)>? progress, 
             CancellationToken cancellationToken,
@@ -162,10 +165,11 @@ namespace SecureFileMonitor.Core.Services
                  {
                      if (cancellationToken.IsCancellationRequested) return;
 
-                     // --- SKIP LOGIC ---
-                     if (skipWindows && subDir.Name.Equals("Windows", StringComparison.OrdinalIgnoreCase)) continue;
-                     if (skipProgramFiles && (subDir.Name.Equals("Program Files", StringComparison.OrdinalIgnoreCase) || subDir.Name.Equals("Program Files (x86)", StringComparison.OrdinalIgnoreCase))) continue;
-                     // ------------------
+                      // --- SKIP LOGIC ---
+                      if (skipWindows && subDir.Name.Equals("Windows", StringComparison.OrdinalIgnoreCase)) continue;
+                      if (skipProgramFiles && (subDir.Name.Equals("Program Files", StringComparison.OrdinalIgnoreCase) || subDir.Name.Equals("Program Files (x86)", StringComparison.OrdinalIgnoreCase))) continue;
+                      if (skipRecycleBin && subDir.Name.Equals("$Recycle.Bin", StringComparison.OrdinalIgnoreCase)) continue;
+                      // ------------------
 
                      bool isReparse = (subDir.Attributes & FileAttributes.ReparsePoint) != 0;
                      if (isReparse && !scanReparseFolders) continue;

@@ -8,6 +8,9 @@ namespace SecureFileMonitor.Core.Models
     {
         [PrimaryKey]
         public string FilePath { get; set; } = string.Empty;
+
+        [Ignore]
+        public string DirectoryName => System.IO.Path.GetDirectoryName(FilePath) ?? "";
         
         [ObservableProperty]
         private bool _isSelected;

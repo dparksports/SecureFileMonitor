@@ -14,7 +14,7 @@ namespace SecureFileMonitor.Core.Services
         Task<IEnumerable<FileEntry>> GetDuplicateFilesAsync();
         Task SaveAuditLogAsync(FileActivityEvent activity);
         Task<List<FileActivityEvent>> GetRecentOfflineActivityAsync(int limit);
-        
+        Task<List<FileActivityEvent>> GetFileHistoryAsync(string filePath);
         Task SaveMetadataAsync(FileMetadata metadata);
         Task<FileMetadata> GetMetadataAsync(string fileId);
         Task<IEnumerable<FileEntry>> SearchFilesAsync(float[] queryVector, int limit = 10);
